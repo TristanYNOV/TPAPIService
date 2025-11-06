@@ -10,7 +10,7 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
   async register(dto: RegisterDto) {
-    const dtoInstance = dto instanceof RegisterDto ? dto : plainToInstance(RegisterDto, dto);
+    const dtoInstance = dto;
     const errors = await validate(dtoInstance);
     if (errors.length > 0) {
       throw new BadRequestException(errors);
