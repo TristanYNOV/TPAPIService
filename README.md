@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 6 — Posts: Like](#étape-6--posts-like)
 - [Étape 5 — Posts: List](#étape-5--posts-list)
 - [Étape 4 — Posts: Create](#étape-4--posts-create)
 - [Étape 3 — Auth: Login](#étape-3--auth-login)
@@ -116,12 +117,29 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 6 — Posts: Like
 - Étape 5 — Posts: List
 - Étape 4 — Posts: Create
 - Étape 3 — Auth: Login
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 6 — Posts: Like
+- **Objectif** : exposer l'endpoint `POST /posts/{postId}/like` pour ajouter un like authentifié et renvoyer le compteur associé.
+- **Sécurité** : authentification JWT obligatoire (`Authorization: Bearer <token>`). Un utilisateur ne peut liker un même post qu'une seule fois ; les appels répétés renvoient le même compteur.
+- **Réponses attendues** :
+  - `404 Not Found` si le post n'existe pas.
+  - `200 OK` avec `{ "likes": <number> }` après l'opération. La première requête incrémente le compteur, les suivantes renvoient le compteur inchangé.
+- **Tests** :
+  ```bash
+  npm run test:e2e -- posts.e2e-spec.ts
+  ```
+- **Postman** : nouvelle requête `Posts — Like` (`POST {{baseUrl}}/posts/{{postId}}/like`) avec l'en-tête `Authorization: Bearer {{token}}`. Le test peut être enchaîné après `Posts — Create` en réutilisant la variable `{{postId}}`.
+- **Vérifications manuelles** :
+  - `curl -X POST "{{baseUrl}}/posts/<postId>/like" -H "Authorization: Bearer <token>"`
+  - Enchaîner les requêtes Postman `Posts — Create` puis `Posts — Like` pour confirmer l'idempotence.
+- **Risques sécurité résiduels** : l'endpoint dépend d'une authentification stricte et les messages d'erreur restent volontairement succincts pour ne pas divulguer d'information inutile.
 
 ## Étape 5 — Posts: List
 - **Objectif** : exposer l'endpoint `GET /posts` avec une pagination `cursor`/`limit` ordonnée par `createdAt DESC`, renvoyant `{ data, nextCursor }`.

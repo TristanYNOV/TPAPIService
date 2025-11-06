@@ -192,4 +192,58 @@ describe('PostsController (e2e)', () => {
       expect(secondPage.body.nextCursor).toBeNull();
     });
   });
+
+  describe('POST /posts/:postId/like', () => {
+    async function registerAndLogin(email: string) {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password: 'password123' })
+        .expect(201);
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: 'password123' })
+        .expect(200);
+
+      return loginResponse.body.access_token as string;
+    }
+
+    it('should return 404 when the post does not exist', async () => {
+      const token = await registerAndLogin('dave@example.com');
+
+      await request(app.getHttpServer())
+        .post('/posts/non-existing/like')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('should be idempotent and return the like count', async () => {
+      const token = await registerAndLogin('eve@example.com');
+
+      const postResponse = await request(app.getHttpServer())
+        .post('/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'A likable post' })
+        .expect(201);
+
+      const postId = postResponse.body.id as string;
+
+      const firstLike = await request(app.getHttpServer())
+        .post(`/posts/${postId}/like`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(firstLike.body).toEqual({ likes: 1 });
+
+      const secondLike = await request(app.getHttpServer())
+        .post(`/posts/${postId}/like`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(secondLike.body).toEqual({ likes: 1 });
+
+      const likeCount = await prisma.like.count({ where: { postId } });
+      expect(likeCount).toBe(1);
+    });
+  });
 });
