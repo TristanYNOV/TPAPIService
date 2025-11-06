@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étape 1 — smoke test racine." 
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke) et 2 (auth/register)."
   },
   "item": [
     {
@@ -62,6 +62,67 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Auth — Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "Réponse attendue",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "body": "{\n  \"id\": \"cmhxxxxxxxxxxxxx\",\n  \"email\": \"alice@example.com\",\n  \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n}"
+        }
+      ]
     }
   ]
 }

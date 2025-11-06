@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 2 — Auth: Register](#étape-2--auth-register)
 - [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
 - [Étape 1 — Smoke test (GET /)](#étape-1--smoke-test-get-)
 
@@ -112,6 +113,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
 
@@ -154,3 +156,27 @@ npx prisma generate
   - `curl http://localhost:3000/`
   - Requête Postman `Smoke — GET /`
 - **Risques sécurité résiduels** : minimes (endpoint public), vérifier que `helmet` et la limitation de débit (`rate-limit`) restent activés via `main.ts`.
+
+## Étape 2 — Auth: Register
+- **Objectif** : exposer l'endpoint `POST /auth/register` permettant de créer un compte utilisateur à partir d'un couple `{ email, password }`.
+- **Règles de validation** :
+  - `email` doit être une adresse valide et unique (conflit → `409 Conflict`).
+  - `password` doit contenir au moins 8 caractères.
+  - Les mots de passe sont hachés via Argon2 avant stockage et ne sont jamais renvoyés en réponse ou loggés.
+  - Les contrôles de validation lèvent une `400 Bad Request` en cas de payload invalide.
+- **Réponse attendue (201)** : `{ "id": "...", "email": "alice@example.com", "createdAt": "..." }`.
+- **Limitation de débit** : le plugin Fastify `@fastify/rate-limit` est toujours actif (config globale) et protège l'ensemble des routes, y compris `/auth/*`, contre la force brute.
+- **Tests** :
+  - Unitaires (`AuthService`) :
+    ```bash
+    npm run test -- auth/auth.service.spec.ts
+    ```
+  - End-to-end :
+    ```bash
+    npm run test:e2e -- auth.e2e-spec.ts
+    ```
+- **Vérifications manuelles** :
+  - `curl -X POST {{baseUrl}}/auth/register -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
+  - Requête Postman `Auth — Register` (voir collection mise à jour).
+- **Postman** : nouvelle requête `Auth — Register` (`POST {{baseUrl}}/auth/register`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. La réponse attendue est le payload utilisateur sans mot de passe.
+- **Risques sécurité résiduels** : surveiller les tentatives de brute force (limitation de débit déjà en place), garantir le stockage chiffré des secrets Prisma (`DATABASE_URL`) et vérifier que seuls les champs autorisés sont renvoyés côté API.
