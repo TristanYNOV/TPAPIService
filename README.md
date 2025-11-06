@@ -13,6 +13,7 @@
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
 - [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
+- [Étape 1 — Smoke test (GET /)](#étape-1--smoke-test-get-)
 
 ## Aperçu
 Cette application utilise [NestJS](https://nestjs.com) avec l'adaptateur Fastify et Prisma pour la couche d'accès aux données. Elle servira de socle pour construire l'API REST sécurisée du POC Social.
@@ -111,6 +112,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
 
 ## Étape 0 — Mise en place de la base documentaire
@@ -133,3 +135,22 @@ npx prisma generate
 - Clé JWT d'exemple (`JWT_SECRET`) à remplacer par une valeur forte avant toute mise en prod.
 - Pas de mécanisme d'authentification ni de validation configuré à cette étape.
 - Fichier `.env` à protéger (ne pas versionner, limiter les accès).
+
+## Étape 1 — Smoke test (GET /)
+- **Objectif** : mettre en place la base des tests e2e (Jest + adaptateur Fastify) et exposer un endpoint racine renvoyant `{ "status": "ok" }`.
+- **Fichiers modifiés/ajoutés** :
+  - `src/app.controller.ts`, `src/app.service.ts`, `src/app.controller.spec.ts`
+  - `test/jest-e2e.json`, `test/app.e2e-spec.ts`
+  - `postman/SocialPOC.postman_collection.json`, `postman/SocialPOC.local.postman_environment.json`
+- **Comment lancer le smoke test** :
+  ```bash
+  npm run test:e2e
+  ```
+- **Bloc Postman** :
+  - Requête `Smoke — GET /` : `GET {{baseUrl}}/`
+  - Réponse attendue : `{"status":"ok"}`
+  - Procédure : ré-importer ou mettre à jour `postman/SocialPOC.postman_collection.json` et `postman/SocialPOC.local.postman_environment.json` pour récupérer la requête.
+- **Vérifications manuelles** :
+  - `curl http://localhost:3000/`
+  - Requête Postman `Smoke — GET /`
+- **Risques sécurité résiduels** : minimes (endpoint public), vérifier que `helmet` et la limitation de débit (`rate-limit`) restent activés via `main.ts`.

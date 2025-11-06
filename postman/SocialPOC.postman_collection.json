@@ -3,9 +3,42 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étape 0 — requête placeholder."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étape 1 — smoke test racine." 
   },
   "item": [
+    {
+      "name": "Smoke — GET /",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": [
+            "{{baseUrl}}"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "Réponse attendue",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "body": "{\n  \"status\": \"ok\"\n}"
+        }
+      ]
+    },
     {
       "name": "GET Placeholder",
       "request": {
