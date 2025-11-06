@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register) et 3 (auth/login)."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login) et 4 (posts/create)."
   },
   "item": [
     {
@@ -160,6 +160,51 @@
           "path": [
             "auth",
             "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — Create",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "5f19cf5e-b3bd-4b09-9c38-2eaf0db7f321",
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set(\"postId\", json.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"content\": \"Hello world\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
           ]
         }
       },
