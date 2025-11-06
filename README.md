@@ -357,3 +357,40 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=
   - Aucune information sensible n'est exposée dans les messages d'erreur.
   - Prépare l'évolution vers un feed personnalisé par utilisateur.
 
+
+## Étape 10 — Tests Postman automatisés (Newman) & CI
+
+![Postman E2E](https://github.com/<ORG_OR_USER>/<REPO>/actions/workflows/postman.yml/badge.svg)
+
+### Local
+- Démarrer manuellement l'API puis exécuter la collection :
+  ```bash
+  npm run postman:run
+  ```
+- OU lancer l'enchaînement complet (démarrage de l'app, attente de `http://127.0.0.1:3000`, exécution Newman) :
+  ```bash
+  npm run ci:e2e
+  ```
+
+### CI
+- Le workflow **Postman E2E** s'exécute automatiquement sur chaque `push`/`pull_request` vers `main`.
+- Les rapports JUnit sont publiés en tant qu'artifact (`newman-report.xml`).
+- Définir `JWT_SECRET` dans **Settings → Secrets and variables → Actions → Repository secrets** afin que le workflow puisse authentifier les requêtes.
+
+### Notes
+- SQLite : la migration génère `dev.db` directement sur le runner GitHub Actions.
+- Passage à PostgreSQL : adapter `DATABASE_URL` et déclarer un service `postgres` dans le workflow.
+
+### Dépannage
+- **DATABASE_URL manquant** : s'assurer que la variable est définie dans le job ou qu'un fichier `.env` est chargé via `@nestjs/config`.
+- **Token Postman vide** : lancer d'abord la requête `Auth — Login` (un test de la collection hydrate `{{token}}`).
+
+### Collection Postman — exigences d’assertions
+- `Auth — Register` : vérifie le `201`, la présence de `{ id, email, createdAt }` et l'absence du champ `password`.
+- `Auth — Login` : attend un `200`, vérifie la présence de `access_token` et renseigne `{{token}}`.
+- `Posts — Create` : attend un `201` et stocke `{{postId}}`.
+- `Posts — List (Page 1)` : attend un `200`, enregistre `{{page1Ids}}` et `{{nextCursor}}`.
+- `Posts — Insert between pages` : ajoute un post intermédiaire pour tester l'absence de doublons.
+- `Posts — List (NextPage)` : attend un `200`, vérifie l'absence de doublons avec `page1Ids` et met à jour `{{nextCursor}}`.
+- `Posts — Like` : attend un `200` et vérifie qu'un re-like ne modifie pas le compteur.
+- Toutes les requêtes de lecture (`/posts`, `/users/:userId/posts`) héritent de l'en-tête `Authorization: Bearer {{token}}` défini au niveau de la collection.
