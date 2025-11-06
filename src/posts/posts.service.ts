@@ -76,7 +76,7 @@ export class PostsService {
           createdAt: createdAtDate,
           id,
         },
-      } satisfies PostCompositeCursor;
+      } as PostCompositeCursor;
     }
 
     const posts = await this.prisma.post.findMany({
