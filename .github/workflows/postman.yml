@@ -63,21 +63,12 @@ jobs:
 
       - name: Generate Prisma client
         run: npx prisma generate --schema=./prisma/schema.prisma
-        env:
-          DATABASE_URL: "file:./dev.db"
 
       - name: Prepare DB (SQLite)
         run: npx prisma migrate dev --name init --schema=./prisma/schema.prisma
-        env:
-          DATABASE_URL: "file:./dev.db"
 
       - name: Run Postman collection (start app, then newman)
         run: npm run ci:e2e
-        env:
-          # Secrets/vars nécessaires à l'app :
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN: "1d"
-          DATABASE_URL: "file:./dev.db"
 
       - name: Upload JUnit report
         if: success() || failure()
