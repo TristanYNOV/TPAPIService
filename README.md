@@ -12,6 +12,8 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 10 — Tests Postman automatisés (Newman) & CI](#étape-10--tests-postman-automatisés-newman--ci)
+- [Étape 9 — Auth obligatoire pour la lecture des posts](#étape-9--auth-obligatoire-pour-la-lecture-des-posts)
 - [Étape 8 — Posts: Keyset pagination](#étape-8--posts-keyset-pagination)
 - [Étape 7 — Posts: Feed scopes](#étape-7--posts-feed-scopes)
 - [Étape 6 — Posts: Like](#étape-6--posts-like)
@@ -19,8 +21,8 @@
 - [Étape 4 — Posts: Create](#étape-4--posts-create)
 - [Étape 3 — Auth: Login](#étape-3--auth-login)
 - [Étape 2 — Auth: Register](#étape-2--auth-register)
-- [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
 - [Étape 1 — Smoke test (GET /)](#étape-1--smoke-test-get-)
+- [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
 
 ## Aperçu
 Cette application utilise [NestJS](https://nestjs.com) avec l'adaptateur Fastify et Prisma pour la couche d'accès aux données. Elle servira de socle pour construire l'API REST sécurisée du POC Social.
@@ -119,6 +121,8 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 10 — Tests Postman automatisés (Newman) & CI
+- Étape 9 — Auth obligatoire pour la lecture des posts
 - Étape 8 — Posts: Keyset pagination
 - Étape 7 — Posts: Feed scopes
 - Étape 6 — Posts: Like
@@ -128,6 +132,68 @@ npx prisma generate
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 10 — Tests Postman automatisés (Newman) & CI
+
+![Postman E2E](https://github.com/<ORG_OR_USER>/<REPO>/actions/workflows/postman.yml/badge.svg)
+
+### Local
+- Démarrer manuellement l'API puis exécuter la collection :
+  ```bash
+  npm run postman:run
+  ```
+- OU lancer l'enchaînement complet (démarrage de l'app, attente de `http://127.0.0.1:3000`, exécution Newman) :
+  ```bash
+  npm run ci:e2e
+  ```
+
+### CI
+- Le workflow **Postman E2E** s'exécute automatiquement sur chaque `push`/`pull_request` vers `main`.
+- Les rapports JUnit sont publiés en tant qu'artifact (`newman-report.xml`).
+- Définir `JWT_SECRET` dans **Settings → Secrets and variables → Actions → Repository secrets** afin que le workflow puisse authentifier les requêtes.
+
+### Notes
+- SQLite : la migration génère `dev.db` directement sur le runner GitHub Actions.
+- Passage à PostgreSQL : adapter `DATABASE_URL` et déclarer un service `postgres` dans le workflow.
+
+### Dépannage
+- **DATABASE_URL manquant** : s'assurer que la variable est définie dans le job ou qu'un fichier `.env` est chargé via `@nestjs/config`.
+- **Token Postman vide** : lancer d'abord la requête `Auth — Login` (un test de la collection hydrate `{{token}}`).
+
+### Collection Postman — exigences d’assertions
+- `Auth — Register` : vérifie le `201`, la présence de `{ id, email, createdAt }` et l'absence du champ `password`.
+- `Auth — Login` : attend un `200`, vérifie la présence de `access_token` et renseigne `{{token}}`.
+- `Posts — Create` : attend un `201` et stocke `{{postId}}`.
+- `Posts — List (Page 1)` : attend un `200`, enregistre `{{page1Ids}}` et `{{nextCursor}}`.
+- `Posts — Insert between pages` : ajoute un post intermédiaire pour tester l'absence de doublons.
+- `Posts — List (NextPage)` : attend un `200`, vérifie l'absence de doublons avec `page1Ids` et met à jour `{{nextCursor}}`.
+- `Posts — Like` : attend un `200` et vérifie qu'un re-like ne modifie pas le compteur.
+- Toutes les requêtes de lecture (`/posts`, `/users/:userId/posts`) héritent de l'en-tête `Authorization: Bearer {{token}}` défini au niveau de la collection.
+
+## Étape 9 — Auth obligatoire pour la lecture des posts
+
+- **Résumé** : Tous les endpoints de lecture de posts nécessitent `Authorization: Bearer {{token}}`.
+- **Usage** :
+  - Exécuter « Auth — Login » dans Postman pour hydrater `{{token}}`.
+  - Utiliser « Posts — List (global/me) » et « Users — Posts (by userId) » (héritent du header Bearer).
+  - Exemples `curl` :
+    ```bash
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
+    ```
+- **Notes sécurité** :
+  - `401 Unauthorized` si le header `Authorization` est absent ou invalide.
+  - Aucune information sensible n'est exposée dans les messages d'erreur.
+  - Prépare l'évolution vers un feed personnalisé par utilisateur.
+
+## Étape 8 — Posts: Keyset pagination
+- **Objectif** : garantir un scroll infini sans doublon en ordonnant les posts par `createdAt DESC, id DESC` et en utilisant un curseur composite `{ createdAt, id }`.
+- **Pourquoi ce couple est unique** : deux posts peuvent partager la même seconde de création mais pas la même paire `(createdAt, id)` ; la contrainte `@@unique([createdAt, id], name: "createdAt_id")` impose un ordre strictement décroissant et stable, même si de nouveaux posts apparaissent entre deux requêtes.
+- **Format du cursor** : l'API retourne un objet JSON `{ "createdAt": "<ISO-8601>", "id": "<cuid>" }`. Pour charger la page suivante, transmettez ce JSON stringifié dans le paramètre `cursor`.
+- **Exemple encodé** : `GET /posts?limit=2&cursor=%7B%22createdAt%22%3A%222024-05-01T11%3A00%3A00.000Z%22%2C%22id%22%3A%22clx123example%22%7D`.
+- **Réponse standardisée** : `{ "data": [...], "nextCursor": { createdAt, id } | null }`. Lorsque `nextCursor` vaut `null`, il n'y a plus de page suivante.
+- **Migrations & génération Prisma** : appliquez la migration avec `npx prisma migrate deploy` (ou `npx prisma migrate dev`) puis exécutez `npx prisma generate` pour rafraîchir le client Prisma. Sans cette étape, TypeScript n'a pas accès à la clé composite `createdAt_id` utilisée par la pagination.
 
 ## Étape 7 — Posts: Feed scopes
 - **Objectif** : unifier les réponses de collection et introduire trois vues de feed protégées par JWT (`Authorization: Bearer <token>`).
@@ -171,14 +237,6 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
 curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
 curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
 ```
-
-## Étape 8 — Posts: Keyset pagination
-- **Objectif** : garantir un scroll infini sans doublon en ordonnant les posts par `createdAt DESC, id DESC` et en utilisant un curseur composite `{ createdAt, id }`.
-- **Pourquoi ce couple est unique** : deux posts peuvent partager la même seconde de création mais pas la même paire `(createdAt, id)` ; la contrainte `@@unique([createdAt, id], name: "createdAt_id")` impose un ordre strictement décroissant et stable, même si de nouveaux posts apparaissent entre deux requêtes.
-- **Format du cursor** : l'API retourne un objet JSON `{ "createdAt": "<ISO-8601>", "id": "<cuid>" }`. Pour charger la page suivante, transmettez ce JSON stringifié dans le paramètre `cursor`.
-- **Exemple encodé** : `GET /posts?limit=2&cursor=%7B%22createdAt%22%3A%222024-05-01T11%3A00%3A00.000Z%22%2C%22id%22%3A%22clx123example%22%7D`.
-- **Réponse standardisée** : `{ "data": [...], "nextCursor": { createdAt, id } | null }`. Lorsque `nextCursor` vaut `null`, il n'y a plus de page suivante.
-- **Migrations & génération Prisma** : appliquez la migration avec `npx prisma migrate deploy` (ou `npx prisma migrate dev`) puis exécutez `npx prisma generate` pour rafraîchir le client Prisma. Sans cette étape, TypeScript n'a pas accès à la clé composite `createdAt_id` utilisée par la pagination.
 
 ## Étape 6 — Posts: Like
 - **Objectif** : exposer l'endpoint `POST /posts/{postId}/like` pour ajouter un like authentifié et renvoyer le compteur associé.
@@ -234,88 +292,6 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=
   - Enchaîner les requêtes Postman `Posts — List (page 1)` puis `Posts — List (page 2)` pour valider la pagination.
 - **Risques sécurité résiduels** : veiller à ne pas exposer de données sensibles dans l'objet `author` (limité à `{ id, email }`) et surveiller les limites de pagination pour éviter les abus.
 
-## Étape 3 — Auth: Login
-- **Objectif** : exposer l'endpoint `POST /auth/login` qui renvoie un JWT signé (`{ "access_token": "..." }`) contenant le payload `{ sub, email }` et dont la durée de validité dépend des variables d'environnement `JWT_SECRET` et `JWT_EXPIRES_IN`.
-- **Validation** : mêmes règles que pour l'inscription (`email` valide, `password` ≥ 8 caractères). Une combinaison invalide d'identifiants renvoie `401 Unauthorized`.
-- **Réponse attendue (200)** : `{ "access_token": "eyJhbGci..." }`.
-- **Tests** :
-  - Unitaires (`AuthService`) :
-    ```bash
-    npm run test -- auth/auth.service.spec.ts
-    ```
-  - End-to-end :
-    ```bash
-    npm run test:e2e -- auth.e2e-spec.ts
-    ```
-- **Postman** : nouvelle requête `Auth — Login` (`POST {{baseUrl}}/auth/login`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. Le script de test enregistre automatiquement `pm.environment.set("token", json.access_token);` afin d'alimenter la variable `{{token}}`.
-- **Vérifications manuelles** :
-  - `curl -X POST {{baseUrl}}/auth/login -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
-  - Requête Postman `Auth — Login` (vérifier que la variable d'environnement `token` est remplie après l'exécution).
-- **Risques sécurité résiduels** : utiliser un `JWT_SECRET` robuste (hors code source) et surveiller la durée de vie des tokens (`JWT_EXPIRES_IN`) pour éviter une expiration trop courte en production.
-
-## Étape 0 — Mise en place de la base documentaire
-- **Objectifs** : fournir un guide de démarrage (prérequis, installation, scripts), préparer les fichiers Postman et structurer la documentation.
-- **Comment lancer les tests** :
-  ```bash
-  npm run test
-  npm run test:e2e
-  ```
-- **Bloc Postman** :
-  - Variables : `{{baseUrl}} = http://localhost:3000`, `{{token}} = ""` (vide).
-  - Importer `postman/SocialPOC.postman_collection.json` et `postman/SocialPOC.local.postman_environment.json`.
-  - Requêtes disponibles pour cette étape : `GET {{baseUrl}}/placeholder` (placeholder en attendant les endpoints réels).
-
-### Vérifications manuelles recommandées
-- `curl http://localhost:3000/placeholder`
-- Requête Postman `GET {{baseUrl}}/placeholder`
-
-### Risques sécurité résiduels
-- Clé JWT d'exemple (`JWT_SECRET`) à remplacer par une valeur forte avant toute mise en prod.
-- Pas de mécanisme d'authentification ni de validation configuré à cette étape.
-- Fichier `.env` à protéger (ne pas versionner, limiter les accès).
-
-## Étape 1 — Smoke test (GET /)
-- **Objectif** : mettre en place la base des tests e2e (Jest + adaptateur Fastify) et exposer un endpoint racine renvoyant `{ "status": "ok" }`.
-- **Fichiers modifiés/ajoutés** :
-  - `src/app.controller.ts`, `src/app.service.ts`, `src/app.controller.spec.ts`
-  - `test/jest-e2e.json`, `test/app.e2e-spec.ts`
-  - `postman/SocialPOC.postman_collection.json`, `postman/SocialPOC.local.postman_environment.json`
-- **Comment lancer le smoke test** :
-  ```bash
-  npm run test:e2e
-  ```
-- **Bloc Postman** :
-  - Requête `Smoke — GET /` : `GET {{baseUrl}}/`
-  - Réponse attendue : `{"status":"ok"}`
-  - Procédure : ré-importer ou mettre à jour `postman/SocialPOC.postman_collection.json` et `postman/SocialPOC.local.postman_environment.json` pour récupérer la requête.
-- **Vérifications manuelles** :
-  - `curl http://localhost:3000/`
-  - Requête Postman `Smoke — GET /`
-- **Risques sécurité résiduels** : minimes (endpoint public), vérifier que `helmet` et la limitation de débit (`rate-limit`) restent activés via `main.ts`.
-
-## Étape 2 — Auth: Register
-- **Objectif** : exposer l'endpoint `POST /auth/register` permettant de créer un compte utilisateur à partir d'un couple `{ email, password }`.
-- **Règles de validation** :
-  - `email` doit être une adresse valide et unique (conflit → `409 Conflict`).
-  - `password` doit contenir au moins 8 caractères.
-  - Les mots de passe sont hachés via Argon2 avant stockage et ne sont jamais renvoyés en réponse ou loggés.
-  - Les contrôles de validation lèvent une `400 Bad Request` en cas de payload invalide.
-- **Réponse attendue (201)** : `{ "id": "...", "email": "alice@example.com", "createdAt": "..." }`.
-- **Limitation de débit** : le plugin Fastify `@fastify/rate-limit` est toujours actif (config globale) et protège l'ensemble des routes, y compris `/auth/*`, contre la force brute.
-- **Tests** :
-  - Unitaires (`AuthService`) :
-    ```bash
-    npm run test -- auth/auth.service.spec.ts
-    ```
-  - End-to-end :
-    ```bash
-    npm run test:e2e -- auth.e2e-spec.ts
-    ```
-- **Vérifications manuelles** :
-  - `curl -X POST {{baseUrl}}/auth/register -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
-  - Requête Postman `Auth — Register` (voir collection mise à jour).
-- **Postman** : nouvelle requête `Auth — Register` (`POST {{baseUrl}}/auth/register`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. La réponse attendue est le payload utilisateur sans mot de passe.
-- **Risques sécurité résiduels** : surveiller les tentatives de brute force (limitation de débit déjà en place), garantir le stockage chiffré des secrets Prisma (`DATABASE_URL`) et vérifier que seuls les champs autorisés sont renvoyés côté API.
 ## Étape 4 — Posts: Create
 - **Objectif** : permettre à un utilisateur authentifié de créer un post via `POST /posts` en fournissant un contenu non vide.
 - **Sécurité** : l'en-tête `Authorization: Bearer {{token}}` est obligatoire (token issu de `/auth/login`). Une absence de token déclenche `401 Unauthorized`.
@@ -340,57 +316,85 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=
   - Exécuter la requête Postman `Posts — Create` après authentification.
 - **Risques sécurité résiduels** : conserver les mots de passe des utilisateurs hors de toute réponse API (seules les informations publiques de l'auteur sont renvoyées) et veiller à la confidentialité du token JWT.
 
-## Étape 9 — Auth obligatoire pour la lecture des posts
-
-- **Résumé** : Tous les endpoints de lecture de posts nécessitent `Authorization: Bearer {{token}}`.
-- **Usage** :
-  - Exécuter « Auth — Login » dans Postman pour hydrater `{{token}}`.
-  - Utiliser « Posts — List (global/me) » et « Users — Posts (by userId) » (héritent du header Bearer).
-  - Exemples `curl` :
+## Étape 3 — Auth: Login
+- **Objectif** : exposer l'endpoint `POST /auth/login` qui renvoie un JWT signé (`{ "access_token": "..." }`) contenant le payload `{ sub, email }` et dont la durée de validité dépend des variables d'environnement `JWT_SECRET` et `JWT_EXPIRES_IN`.
+- **Validation** : mêmes règles que pour l'inscription (`email` valide, `password` ≥ 8 caractères). Une combinaison invalide d'identifiants renvoie `401 Unauthorized`.
+- **Réponse attendue (200)** : `{ "access_token": "eyJhbGci..." }`.
+- **Tests** :
+  - Unitaires (`AuthService`) :
     ```bash
-    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
-    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
-    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
+    npm run test -- auth/auth.service.spec.ts
     ```
-- **Notes sécurité** :
-  - `401 Unauthorized` si le header `Authorization` est absent ou invalide.
-  - Aucune information sensible n'est exposée dans les messages d'erreur.
-  - Prépare l'évolution vers un feed personnalisé par utilisateur.
+  - End-to-end :
+    ```bash
+    npm run test:e2e -- auth.e2e-spec.ts
+    ```
+- **Postman** : nouvelle requête `Auth — Login` (`POST {{baseUrl}}/auth/login`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. Le script de test enregistre automatiquement `pm.environment.set("token", json.access_token);` afin d'alimenter la variable `{{token}}`.
+- **Vérifications manuelles** :
+  - `curl -X POST {{baseUrl}}/auth/login -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
+  - Requête Postman `Auth — Login` (vérifier que la variable d'environnement `token` est remplie après l'exécution).
+- **Risques sécurité résiduels** : utiliser un `JWT_SECRET` robuste (hors code source) et surveiller la durée de vie des tokens (`JWT_EXPIRES_IN`) pour éviter une expiration trop courte en production.
 
+## Étape 2 — Auth: Register
+- **Objectif** : exposer l'endpoint `POST /auth/register` permettant de créer un compte utilisateur à partir d'un couple `{ email, password }`.
+- **Règles de validation** :
+  - `email` doit être une adresse valide et unique (conflit → `409 Conflict`).
+  - `password` doit contenir au moins 8 caractères.
+  - Les mots de passe sont hachés via Argon2 avant stockage et ne sont jamais renvoyés en réponse ou loggés.
+  - Les contrôles de validation lèvent une `400 Bad Request` en cas de payload invalide.
+- **Réponse attendue (201)** : `{ "id": "...", "email": "alice@example.com", "createdAt": "..." }`.
+- **Limitation de débit** : le plugin Fastify `@fastify/rate-limit` est toujours actif (config globale) et protège l'ensemble des routes, y compris `/auth/*`, contre la force brute.
+- **Tests** :
+  - Unitaires (`AuthService`) :
+    ```bash
+    npm run test -- auth/auth.service.spec.ts
+    ```
+  - End-to-end :
+    ```bash
+    npm run test:e2e -- auth.e2e-spec.ts
+    ```
+- **Vérifications manuelles** :
+  - `curl -X POST {{baseUrl}}/auth/register -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
+  - Requête Postman `Auth — Register` (voir collection mise à jour).
+- **Postman** : nouvelle requête `Auth — Register` (`POST {{baseUrl}}/auth/register`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. La réponse attendue est le payload utilisateur sans mot de passe.
+- **Risques sécurité résiduels** : surveiller les tentatives de brute force (limitation de débit déjà en place), garantir le stockage chiffré des secrets Prisma (`DATABASE_URL`) et vérifier que seuls les champs autorisés sont renvoyés côté API.
 
-## Étape 10 — Tests Postman automatisés (Newman) & CI
-
-![Postman E2E](https://github.com/<ORG_OR_USER>/<REPO>/actions/workflows/postman.yml/badge.svg)
-
-### Local
-- Démarrer manuellement l'API puis exécuter la collection :
+## Étape 1 — Smoke test (GET /)
+- **Objectif** : mettre en place la base des tests e2e (Jest + adaptateur Fastify) et exposer un endpoint racine renvoyant `{ "status": "ok" }`.
+- **Fichiers modifiés/ajoutés** :
+  - `src/app.controller.ts`, `src/app.service.ts`, `src/app.controller.spec.ts`
+  - `test/jest-e2e.json`, `test/app.e2e-spec.ts`
+  - `postman/SocialPOC.postman_collection.json`, `postman/SocialPOC.local.postman_environment.json`
+- **Comment lancer le smoke test** :
   ```bash
-  npm run postman:run
+  npm run test:e2e
   ```
-- OU lancer l'enchaînement complet (démarrage de l'app, attente de `http://127.0.0.1:3000`, exécution Newman) :
+- **Bloc Postman** :
+  - Requête `Smoke — GET /` : `GET {{baseUrl}}/`
+  - Réponse attendue : `{"status":"ok"}`
+  - Procédure : ré-importer ou mettre à jour `postman/SocialPOC.postman_collection.json` et `postman/SocialPOC.local.postman_environment.json` pour récupérer la requête.
+- **Vérifications manuelles** :
+  - `curl http://localhost:3000/`
+  - Requête Postman `Smoke — GET /`
+- **Risques sécurité résiduels** : minimes (endpoint public), vérifier que `helmet` et la limitation de débit (`rate-limit`) restent activés via `main.ts`.
+
+## Étape 0 — Mise en place de la base documentaire
+- **Objectifs** : fournir un guide de démarrage (prérequis, installation, scripts), préparer les fichiers Postman et structurer la documentation.
+- **Comment lancer les tests** :
   ```bash
-  npm run ci:e2e
+  npm run test
+  npm run test:e2e
   ```
+- **Bloc Postman** :
+  - Variables : `{{baseUrl}} = http://localhost:3000`, `{{token}} = ""` (vide).
+  - Importer `postman/SocialPOC.postman_collection.json` et `postman/SocialPOC.local.postman_environment.json`.
+  - Requêtes disponibles pour cette étape : `GET {{baseUrl}}/placeholder` (placeholder en attendant les endpoints réels).
 
-### CI
-- Le workflow **Postman E2E** s'exécute automatiquement sur chaque `push`/`pull_request` vers `main`.
-- Les rapports JUnit sont publiés en tant qu'artifact (`newman-report.xml`).
-- Définir `JWT_SECRET` dans **Settings → Secrets and variables → Actions → Repository secrets** afin que le workflow puisse authentifier les requêtes.
+### Vérifications manuelles recommandées
+- `curl http://localhost:3000/placeholder`
+- Requête Postman `GET {{baseUrl}}/placeholder`
 
-### Notes
-- SQLite : la migration génère `dev.db` directement sur le runner GitHub Actions.
-- Passage à PostgreSQL : adapter `DATABASE_URL` et déclarer un service `postgres` dans le workflow.
-
-### Dépannage
-- **DATABASE_URL manquant** : s'assurer que la variable est définie dans le job ou qu'un fichier `.env` est chargé via `@nestjs/config`.
-- **Token Postman vide** : lancer d'abord la requête `Auth — Login` (un test de la collection hydrate `{{token}}`).
-
-### Collection Postman — exigences d’assertions
-- `Auth — Register` : vérifie le `201`, la présence de `{ id, email, createdAt }` et l'absence du champ `password`.
-- `Auth — Login` : attend un `200`, vérifie la présence de `access_token` et renseigne `{{token}}`.
-- `Posts — Create` : attend un `201` et stocke `{{postId}}`.
-- `Posts — List (Page 1)` : attend un `200`, enregistre `{{page1Ids}}` et `{{nextCursor}}`.
-- `Posts — Insert between pages` : ajoute un post intermédiaire pour tester l'absence de doublons.
-- `Posts — List (NextPage)` : attend un `200`, vérifie l'absence de doublons avec `page1Ids` et met à jour `{{nextCursor}}`.
-- `Posts — Like` : attend un `200` et vérifie qu'un re-like ne modifie pas le compteur.
-- Toutes les requêtes de lecture (`/posts`, `/users/:userId/posts`) héritent de l'en-tête `Authorization: Bearer {{token}}` défini au niveau de la collection.
+### Risques sécurité résiduels
+- Clé JWT d'exemple (`JWT_SECRET`) à remplacer par une valeur forte avant toute mise en prod.
+- Pas de mécanisme d'authentification ni de validation configuré à cette étape.
+- Fichier `.env` à protéger (ne pas versionner, limiter les accès).
