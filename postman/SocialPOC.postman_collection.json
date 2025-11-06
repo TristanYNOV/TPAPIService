@@ -10,12 +10,14 @@
       "name": "Smoke — GET /",
       "request": {
         "method": "GET",
-        "header": [],
         "url": {
           "raw": "{{baseUrl}}/",
           "host": [
             "{{baseUrl}}"
           ]
+        },
+        "auth": {
+          "type": "noauth"
         }
       },
       "response": [
@@ -43,14 +45,6 @@
       "name": "GET Placeholder",
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text",
-            "disabled": true
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/placeholder",
           "host": [
@@ -59,6 +53,9 @@
           "path": [
             "placeholder"
           ]
+        },
+        "auth": {
+          "type": "noauth"
         }
       },
       "response": []
@@ -87,6 +84,9 @@
             "auth",
             "register"
           ]
+        },
+        "auth": {
+          "type": "noauth"
         }
       },
       "response": [
@@ -161,6 +161,9 @@
             "auth",
             "login"
           ]
+        },
+        "auth": {
+          "type": "noauth"
         }
       },
       "response": []
@@ -183,11 +186,6 @@
       "request": {
         "method": "POST",
         "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
           {
             "key": "Content-Type",
             "value": "application/json",
@@ -214,13 +212,6 @@
       "name": "Posts — Like",
       "request": {
         "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/posts/{{postId}}/like",
           "host": [
@@ -241,11 +232,15 @@
         {
           "listen": "test",
           "script": {
-            "id": "9f4132ac-73cb-49a3-8b7d-3baea7a1e0c7",
+            "id": "fc3304f9-146c-4017-8eb1-3eaebbecb14d",
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
+              "pm.test('Shape {data,nextCursor}', () => {",
+              "  pm.expect(json).to.have.property('data').that.is.an('array');",
+              "  pm.expect(json).to.have.property('nextCursor');",
+              "});",
               "const ids = json.data.map((post) => post.id);",
               "pm.environment.set(\"page1Ids\", JSON.stringify(ids));",
               "pm.environment.set(\"nextCursor\", JSON.stringify(json.nextCursor));"
@@ -255,13 +250,6 @@
       ],
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/posts?limit={{limit}}",
           "host": [
@@ -298,11 +286,6 @@
         "method": "POST",
         "header": [
           {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          {
             "key": "Content-Type",
             "value": "application/json",
             "type": "text"
@@ -330,12 +313,16 @@
         {
           "listen": "test",
           "script": {
-            "id": "f0e6d2de-830e-4f4d-9a77-1fbe6a2f3c5a",
+            "id": "6348a1a6-3ff8-4f2d-a6f7-1191e0930247",
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "const page1Ids = JSON.parse(pm.environment.get(\"page1Ids\") || '[]');",
+              "pm.test('Shape {data,nextCursor}', () => {",
+              "  pm.expect(json).to.have.property('data').that.is.an('array');",
+              "  pm.expect(json).to.have.property('nextCursor');",
+              "});",
+              "const page1Ids = JSON.parse(pm.environment.get(\"page1Ids\") || \"[]\");",
               "const ids = json.data.map((post) => post.id);",
               "pm.test('No duplicates with page 1', () => {",
               "  ids.forEach((id) => pm.expect(page1Ids).to.not.include(id));",
@@ -347,13 +334,6 @@
       ],
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/posts?limit={{limit}}&cursor={{nextCursor}}",
           "host": [
@@ -382,12 +362,12 @@
         {
           "listen": "test",
           "script": {
-            "id": "b02f47d6-53a8-4d8a-9a6e-0c15f1d16b6a",
+            "id": "b4e037f0-22a1-486c-b7db-07749d88573b",
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "pm.test('Response shape', () => {",
+              "pm.test('Shape {data,nextCursor}', () => {",
               "  pm.expect(json).to.have.property('data').that.is.an('array');",
               "  pm.expect(json).to.have.property('nextCursor');",
               "});"
@@ -397,13 +377,6 @@
       ],
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/posts?scope=global&limit={{limit}}",
           "host": [
@@ -432,28 +405,41 @@
         {
           "listen": "test",
           "script": {
-            "id": "5c142d94-4e6a-4f1a-b78a-5d60d7999e65",
+            "id": "d5ae0e30-0363-4a30-a0c5-da59c5db12e0",
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "pm.test('Response shape', () => {",
+              "pm.test('Shape {data,nextCursor}', () => {",
               "  pm.expect(json).to.have.property('data').that.is.an('array');",
               "  pm.expect(json).to.have.property('nextCursor');",
-              "});"
+              "});",
+              "const token = pm.environment.get('token');",
+              "if (token) {",
+              "  const parts = token.split('.');",
+              "  if (parts.length >= 2) {",
+              "    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');",
+              "    const padding = normalized.length % 4 === 0 ? 0 : 4 - (normalized.length % 4);",
+              "    const padded = normalized + '='.repeat(padding);",
+              "    try {",
+              "      const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));",
+              "      if (payload && payload.sub) {",
+              "        pm.test('Posts belong to the authenticated user', () => {",
+              "          const allOwned = json.data.every((post) => post && post.author && post.author.id === payload.sub);",
+              "          pm.expect(allOwned).to.be.true;",
+              "        });",
+              "      }",
+              "    } catch (error) {",
+              "      console.warn('Impossible de décoder le token pour vérifier les auteurs.', error);",
+              "    }",
+              "  }",
+              "}"
             ]
           }
         }
       ],
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/posts?scope=me&limit={{limit}}",
           "host": [
@@ -482,12 +468,12 @@
         {
           "listen": "test",
           "script": {
-            "id": "4f6a0ca0-449a-469b-9d45-9c1e3b38679f",
+            "id": "ce2a0c6f-8adf-42ee-8f85-8fb6060aad17",
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "pm.test('Response shape', () => {",
+              "pm.test('Shape {data,nextCursor}', () => {",
               "  pm.expect(json).to.have.property('data').that.is.an('array');",
               "  pm.expect(json).to.have.property('nextCursor');",
               "});"
@@ -497,13 +483,6 @@
       ],
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
         "url": {
           "raw": "{{baseUrl}}/users/{{targetUserId}}/posts?limit={{limit}}",
           "host": [
@@ -523,6 +502,30 @@
         }
       },
       "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "id": "3d0d5ab9-b546-442b-bde0-59af89697f0f",
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('token')) {",
+          "  console.warn('token manquant — exécutez “Auth — Login” avant les routes protégées.');",
+          "}"
+        ]
+      }
     }
   ]
 }

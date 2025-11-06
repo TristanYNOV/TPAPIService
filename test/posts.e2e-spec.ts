@@ -111,6 +111,13 @@ describe('PostsController (e2e)', () => {
         .expect(401);
     });
 
+    it('should return 401 for the me scope when unauthenticated', async () => {
+      await request(app.getHttpServer())
+        .get('/posts')
+        .query({ scope: 'me' })
+        .expect(401);
+    });
+
     it('should list posts in the global feed', async () => {
       const [{ token: aliceToken, user: alice }, { user: bob }] = await Promise.all([
         registerAndLogin('alice@example.com'),
