@@ -1,0 +1,54 @@
+name: Postman E2E
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  postman-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Debug workspace (optional)
+        run: |
+          pwd
+          ls -la
+          ls -la prisma || true
+          echo "--- .env preview (masked) ---"
+          grep '^DATABASE_URL=' .env || true
+          grep '^JWT_EXPIRES_IN=' .env || true
+          grep '^JWT_SECRET=' .env | sed 's/.*/JWT_SECRET="***"/' || true
+
+      - name: Copy .env
+        run: cp .env.example .env
+
+      - name: Generate Prisma client
+        working-directory: prisma
+        run: npx prisma generate --schema=./schema.prisma
+
+      - name: Prepare DB (SQLite)
+        working-directory: prisma
+        run: npx prisma migrate dev --name init --schema=./schema.prisma
+
+      - name: Run Postman collection (start app, then newman)
+        run: npm run ci:e2e
+
+      - name: Upload JUnit report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-report
+          path: newman-report.xml

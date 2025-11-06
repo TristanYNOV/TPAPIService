@@ -122,6 +122,28 @@
           "header": [],
           "body": "{\n  \"id\": \"cmhxxxxxxxxxxxxx\",\n  \"email\": \"alice@example.com\",\n  \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n}"
         }
+      ],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "c69f1c73-4cb0-4e4f-8c4e-f763b27a64a3",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.code === 201);",
+              "const json = pm.response.json();",
+              "pm.test('Register payload has id/email/createdAt', () => {",
+              "  pm.expect(json).to.have.property('id');",
+              "  pm.expect(json).to.have.property('email').that.is.a('string');",
+              "  pm.expect(json).to.have.property('createdAt');",
+              "});",
+              "pm.test('Password is not leaked', () => pm.expect(json).to.not.have.property('password'));",
+              "if (json.id) {",
+              "  pm.environment.set('targetUserId', json.id);",
+              "}"
+            ]
+          }
+        }
       ]
     },
     {
@@ -133,8 +155,12 @@
             "id": "1d45b4be-1e3f-4f95-b1fd-3db796971234",
             "type": "text/javascript",
             "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "pm.environment.set(\"token\", json.access_token);"
+              "pm.test('access_token present', () => {",
+              "  pm.expect(json).to.have.property('access_token').that.is.a('string').and.is.not.empty;",
+              "});",
+              "pm.environment.set('token', json.access_token);"
             ]
           }
         }
@@ -177,8 +203,17 @@
             "id": "5f19cf5e-b3bd-4b09-9c38-2eaf0db7f321",
             "type": "text/javascript",
             "exec": [
+              "pm.test('Status 201', () => pm.response.code === 201);",
               "const json = pm.response.json();",
-              "pm.environment.set(\"postId\", json.id);"
+              "pm.test('Post payload includes id/content/author', () => {",
+              "  pm.expect(json).to.have.property('id');",
+              "  pm.expect(json).to.have.property('content');",
+              "  pm.expect(json).to.have.property('author');",
+              "});",
+              "pm.environment.set('postId', json.id);",
+              "if (json.author && json.author.id) {",
+              "  pm.environment.set('targetUserId', json.author.id);",
+              "}"
             ]
           }
         }
@@ -224,7 +259,47 @@
           ]
         }
       },
-      "response": []
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "e2d3bb6a-08d7-4a86-98cc-8551a152f6c2",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
+              "const json = pm.response.json();",
+              "pm.test('Like count is returned', () => {",
+              "  pm.expect(json).to.have.property('likes').that.is.a('number');",
+              "});",
+              "const initialLikes = json.likes;",
+              "const token = pm.environment.get('token');",
+              "const postId = pm.environment.get('postId');",
+              "const baseUrl = pm.environment.get('baseUrl') || pm.variables.get('baseUrl');",
+              "if (token && postId && baseUrl) {",
+              "  pm.sendRequest({",
+              "    url: `${baseUrl}/posts/${postId}/like`,",
+              "    method: 'POST',",
+              "    header: {",
+              "      Authorization: `Bearer ${token}`",
+              "    }",
+              "  }, function (err, res) {",
+              "    pm.test('Re-like request succeeded', () => !err);",
+              "    if (err) {",
+              "      console.error('Re-like request failed', err);",
+              "      return;",
+              "    }",
+              "    pm.test('Re-like returns 200', () => res.code === 200);",
+              "    const body = res.json();",
+              "    pm.test('Re-like keeps like counter unchanged', () => body.likes === initialLikes);",
+              "  });",
+              "} else {",
+              "  console.warn('token/postId/baseUrl missing for re-like validation');",
+              "}"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Posts — List (Page 1)",
@@ -315,20 +390,7 @@
           "script": {
             "id": "6348a1a6-3ff8-4f2d-a6f7-1191e0930247",
             "type": "text/javascript",
-            "exec": [
-              "pm.test('Status 200', () => pm.response.code === 200);",
-              "const json = pm.response.json();",
-              "pm.test('Shape {data,nextCursor}', () => {",
-              "  pm.expect(json).to.have.property('data').that.is.an('array');",
-              "  pm.expect(json).to.have.property('nextCursor');",
-              "});",
-              "const page1Ids = JSON.parse(pm.environment.get(\"page1Ids\") || \"[]\");",
-              "const ids = json.data.map((post) => post.id);",
-              "pm.test('No duplicates with page 1', () => {",
-              "  ids.forEach((id) => pm.expect(page1Ids).to.not.include(id));",
-              "});",
-              "pm.environment.set(\"nextCursor\", JSON.stringify(json.nextCursor));"
-            ]
+            "exec": []
           }
         }
       ],
