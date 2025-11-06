@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 3 — Auth: Login](#étape-3--auth-login)
 - [Étape 2 — Auth: Register](#étape-2--auth-register)
 - [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
 - [Étape 1 — Smoke test (GET /)](#étape-1--smoke-test-get-)
@@ -113,9 +114,29 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 3 — Auth: Login
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 3 — Auth: Login
+- **Objectif** : exposer l'endpoint `POST /auth/login` qui renvoie un JWT signé (`{ "access_token": "..." }`) contenant le payload `{ sub, email }` et dont la durée de validité dépend des variables d'environnement `JWT_SECRET` et `JWT_EXPIRES_IN`.
+- **Validation** : mêmes règles que pour l'inscription (`email` valide, `password` ≥ 8 caractères). Une combinaison invalide d'identifiants renvoie `401 Unauthorized`.
+- **Réponse attendue (200)** : `{ "access_token": "eyJhbGci..." }`.
+- **Tests** :
+  - Unitaires (`AuthService`) :
+    ```bash
+    npm run test -- auth/auth.service.spec.ts
+    ```
+  - End-to-end :
+    ```bash
+    npm run test:e2e -- auth.e2e-spec.ts
+    ```
+- **Postman** : nouvelle requête `Auth — Login` (`POST {{baseUrl}}/auth/login`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. Le script de test enregistre automatiquement `pm.environment.set("token", json.access_token);` afin d'alimenter la variable `{{token}}`.
+- **Vérifications manuelles** :
+  - `curl -X POST {{baseUrl}}/auth/login -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`
+  - Requête Postman `Auth — Login` (vérifier que la variable d'environnement `token` est remplie après l'exécution).
+- **Risques sécurité résiduels** : utiliser un `JWT_SECRET` robuste (hors code source) et surveiller la durée de vie des tokens (`JWT_EXPIRES_IN`) pour éviter une expiration trop courte en production.
 
 ## Étape 0 — Mise en place de la base documentaire
 - **Objectifs** : fournir un guide de démarrage (prérequis, installation, scripts), préparer les fichiers Postman et structurer la documentation.
