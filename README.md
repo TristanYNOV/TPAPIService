@@ -340,3 +340,20 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=
   - Exécuter la requête Postman `Posts — Create` après authentification.
 - **Risques sécurité résiduels** : conserver les mots de passe des utilisateurs hors de toute réponse API (seules les informations publiques de l'auteur sont renvoyées) et veiller à la confidentialité du token JWT.
 
+## Étape 9 — Auth obligatoire pour la lecture des posts
+
+- **Résumé** : Tous les endpoints de lecture de posts nécessitent `Authorization: Bearer {{token}}`.
+- **Usage** :
+  - Exécuter « Auth — Login » dans Postman pour hydrater `{{token}}`.
+  - Utiliser « Posts — List (global/me) » et « Users — Posts (by userId) » (héritent du header Bearer).
+  - Exemples `curl` :
+    ```bash
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
+    curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
+    ```
+- **Notes sécurité** :
+  - `401 Unauthorized` si le header `Authorization` est absent ou invalide.
+  - Aucune information sensible n'est exposée dans les messages d'erreur.
+  - Prépare l'évolution vers un feed personnalisé par utilisateur.
+
