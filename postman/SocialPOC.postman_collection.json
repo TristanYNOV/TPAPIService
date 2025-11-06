@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login) et 4 (posts/create)."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create) et 5 (posts/list)."
   },
   "item": [
     {
@@ -205,6 +205,69 @@
           ],
           "path": [
             "posts"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — List (page 1)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "9f4132ac-73cb-49a3-8b7d-3baea7a1e0c7",
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set(\"nextCursor\", json.nextCursor);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/posts?limit=2",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — List (page 2)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/posts?limit=2&cursor={{nextCursor}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            },
+            {
+              "key": "cursor",
+              "value": "{{nextCursor}}"
+            }
           ]
         }
       },
