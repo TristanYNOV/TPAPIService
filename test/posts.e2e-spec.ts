@@ -20,6 +20,25 @@ describe('PostsController (e2e)', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService;
 
+  async function registerAndLogin(email: string) {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email, password: 'password123' })
+      .expect(201);
+
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password: 'password123' })
+      .expect(200);
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    return {
+      token: loginResponse.body.access_token as string,
+      user,
+    };
+  }
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -84,132 +103,167 @@ describe('PostsController (e2e)', () => {
     expect(typeof response.body.author.id).toBe('string');
   });
 
-  describe('GET /posts', () => {
-    it('should return paginated posts ordered by createdAt desc', async () => {
-      const [author, bob, charlie] = await Promise.all([
-        prisma.user.create({
-          data: {
-            email: 'author@example.com',
-            password: 'hashed-password',
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: 'bob@example.com',
-            password: 'hashed-password',
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: 'charlie@example.com',
-            password: 'hashed-password',
-          },
-        }),
+  describe('GET /posts (feeds)', () => {
+    it('should require authentication for listing posts', async () => {
+      await request(app.getHttpServer())
+        .get('/posts')
+        .query({ scope: 'global' })
+        .expect(401);
+    });
+
+    it('should list posts in the global feed', async () => {
+      const [{ token: aliceToken, user: alice }, { user: bob }] = await Promise.all([
+        registerAndLogin('alice@example.com'),
+        registerAndLogin('bob@example.com'),
       ]);
+
+      const charlie = await prisma.user.create({
+        data: {
+          email: 'charlie@example.com',
+          password: 'hashed-password',
+        },
+      });
 
       const posts = await Promise.all([
         prisma.post.create({
           data: {
-            authorId: author.id,
-            content: 'Post 1',
-            createdAt: new Date('2024-01-01T08:00:00.000Z'),
+            authorId: alice.id,
+            content: 'Alice post',
+            createdAt: new Date('2024-04-01T08:00:00.000Z'),
           },
         }),
         prisma.post.create({
           data: {
-            authorId: author.id,
-            content: 'Post 2',
-            createdAt: new Date('2024-02-01T08:00:00.000Z'),
-          },
-        }),
-        prisma.post.create({
-          data: {
-            authorId: author.id,
-            content: 'Post 3',
+            authorId: bob.id,
+            content: 'Bob post',
             createdAt: new Date('2024-03-01T08:00:00.000Z'),
           },
         }),
         prisma.post.create({
           data: {
-            authorId: author.id,
-            content: 'Post 4',
-            createdAt: new Date('2024-04-01T08:00:00.000Z'),
+            authorId: charlie.id,
+            content: 'Charlie post',
+            createdAt: new Date('2024-02-01T08:00:00.000Z'),
           },
         }),
       ]);
 
-      const expectedOrder = [posts[3], posts[2], posts[1], posts[0]];
+      const response = await request(app.getHttpServer())
+        .get('/posts')
+        .query({ scope: 'global', limit: 10 })
+        .set('Authorization', `Bearer ${aliceToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        nextCursor: null,
+      });
+      expect(response.body.data).toHaveLength(3);
+      expect(response.body.data.map((post: any) => post.id)).toEqual(
+        posts
+          .slice()
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .map((post) => post.id),
+      );
+    });
+
+    it('should list only the current user posts for the me scope', async () => {
+      const [{ token: aliceToken, user: alice }, { user: bob }] = await Promise.all([
+        registerAndLogin('alice2@example.com'),
+        registerAndLogin('bob2@example.com'),
+      ]);
 
       await Promise.all([
-        prisma.like.create({
+        prisma.post.create({
           data: {
-            userId: bob.id,
-            postId: expectedOrder[0].id,
+            authorId: alice.id,
+            content: 'Alice only post',
           },
         }),
-        prisma.like.create({
+        prisma.post.create({
           data: {
-            userId: charlie.id,
-            postId: expectedOrder[0].id,
-          },
-        }),
-        prisma.like.create({
-          data: {
-            userId: bob.id,
-            postId: expectedOrder[1].id,
+            authorId: bob.id,
+            content: 'Bob should not appear',
           },
         }),
       ]);
 
-      const firstPage = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/posts')
-        .query({ limit: 2 })
-        .expect(200);
+        .query({ scope: 'me' })
+        .set('Authorization', `Bearer ${aliceToken}`);
 
-      expect(firstPage.body.data).toHaveLength(2);
-      expect(firstPage.body.data[0].id).toBe(expectedOrder[0].id);
-      expect(firstPage.body.data[1].id).toBe(expectedOrder[1].id);
-      expect(firstPage.body.data[0]._count.likes).toBe(2);
-      expect(firstPage.body.data[1]._count.likes).toBe(1);
-      expect(firstPage.body.data[0].author).toEqual({
-        id: author.id,
-        email: author.email,
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ nextCursor: null });
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
+        content: 'Alice only post',
+        author: { id: alice.id },
       });
-      expect(firstPage.body.data[1].author).toEqual({
-        id: author.id,
-        email: author.email,
+    });
+  });
+
+  describe('GET /users/:userId/posts', () => {
+    it('should require authentication', async () => {
+      const randomId = 'caaaaaaaaaaaaaaaaaaaaaaaa';
+
+      await request(app.getHttpServer())
+        .get(`/users/${randomId}/posts`)
+        .expect(401);
+    });
+
+    it('should list posts for the requested user', async () => {
+      const [{ token: aliceToken, user: alice }, { user: bob }] = await Promise.all([
+        registerAndLogin('alice3@example.com'),
+        registerAndLogin('bob3@example.com'),
+      ]);
+
+      await Promise.all([
+        prisma.post.create({
+          data: {
+            authorId: alice.id,
+            content: 'Alice feed post',
+          },
+        }),
+        prisma.post.create({
+          data: {
+            authorId: bob.id,
+            content: 'Bob feed post',
+          },
+        }),
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get(`/users/${bob.id}/posts`)
+        .set('Authorization', `Bearer ${aliceToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: [
+          expect.objectContaining({
+            author: expect.objectContaining({ id: bob.id }),
+            content: 'Bob feed post',
+          }),
+        ],
+        nextCursor: null,
       });
-      expect(firstPage.body.nextCursor).toBe(expectedOrder[1].id);
+    });
 
-      const secondPage = await request(app.getHttpServer())
-        .get('/posts')
-        .query({ limit: 2, cursor: firstPage.body.nextCursor })
-        .expect(200);
+    it('should return an empty collection when the user does not exist', async () => {
+      const { token: aliceToken } = await registerAndLogin('alice4@example.com');
+      const unknownUserId = 'cbbbbbbbbbbbbbbbbbbbbbbbb';
 
-      expect(secondPage.body.data).toHaveLength(2);
-      expect(secondPage.body.data[0].id).toBe(expectedOrder[2].id);
-      expect(secondPage.body.data[1].id).toBe(expectedOrder[3].id);
-      expect(secondPage.body.nextCursor).toBeNull();
+      const response = await request(app.getHttpServer())
+        .get(`/users/${unknownUserId}/posts`)
+        .set('Authorization', `Bearer ${aliceToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ data: [], nextCursor: null });
     });
   });
 
   describe('POST /posts/:postId/like', () => {
-    async function registerAndLogin(email: string) {
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ email, password: 'password123' })
-        .expect(201);
-
-      const loginResponse = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email, password: 'password123' })
-        .expect(200);
-
-      return loginResponse.body.access_token as string;
-    }
-
     it('should return 404 when the post does not exist', async () => {
-      const token = await registerAndLogin('dave@example.com');
+      const { token } = await registerAndLogin('dave@example.com');
 
       await request(app.getHttpServer())
         .post('/posts/non-existing/like')
@@ -218,7 +272,7 @@ describe('PostsController (e2e)', () => {
     });
 
     it('should be idempotent and return the like count', async () => {
-      const token = await registerAndLogin('eve@example.com');
+      const { token } = await registerAndLogin('eve@example.com');
 
       const postResponse = await request(app.getHttpServer())
         .post('/posts')

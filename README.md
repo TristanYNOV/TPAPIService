@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 7 — Posts: Feed scopes](#étape-7--posts-feed-scopes)
 - [Étape 6 — Posts: Like](#étape-6--posts-like)
 - [Étape 5 — Posts: List](#étape-5--posts-list)
 - [Étape 4 — Posts: Create](#étape-4--posts-create)
@@ -117,6 +118,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 7 — Posts: Feed scopes
 - Étape 6 — Posts: Like
 - Étape 5 — Posts: List
 - Étape 4 — Posts: Create
@@ -124,6 +126,49 @@ npx prisma generate
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 7 — Posts: Feed scopes
+- **Objectif** : unifier les réponses de collection et introduire trois vues de feed protégées par JWT (`Authorization: Bearer <token>`).
+
+### Conventions REST retenues
+- Ressources au pluriel, pas de verbes dans les URI, sous-ressource stable `GET /users/:userId/posts`.
+- Réponses de collection uniformisées : `{ "data": [...], "nextCursor": null }` (le cursor enrichi `{ createdAt, id }` arrivera à l'étape 8).
+- Codes HTTP : `200 OK` sur une collection vide, `401 Unauthorized` si le token est absent/invalidé, `400 Bad Request` pour des paramètres rejetés (scope inconnu, limite hors bornes, userId invalide, etc.).
+
+### Vues de feed documentées
+- **Global** (`GET /posts?scope=global`) : renvoie les posts publics récents de tous les utilisateurs. `scope` est optionnel et vaut `global` par défaut afin de garantir la compatibilité ascendante.
+- **Mes posts** (`GET /posts?scope=me`) : renvoie uniquement les posts de l'auteur correspondant au JWT (`req.user.sub`).
+- **Posts d’un user** (`GET /users/:userId/posts`) : sous-ressource REST pour consulter les posts d'un utilisateur précis, même si ce n'est pas l'utilisateur courant.
+
+### Pagination & limites
+- Les paramètres `limit` (défaut 10, maximum 100) et `cursor` sont disponibles sur les trois endpoints. La structure `{ data, nextCursor }` est prête pour l'implémentation du keyset (étape 8).
+- Les identifiants `userId` suivent le format CUID (`c[a-z0-9]{24}`) ; un identifiant valide sans post renvoie `200` avec `data: []`.
+
+### Compatibilité future
+- Le paramètre `scope` est extensible (`global`, `me`, ...). L'ajout de nouvelles valeurs (ex: `following`, `recommended`) ne cassera pas les clients existants.
+
+### Postman — requêtes
+- Ajouter dans la collection trois requêtes GET héritant de l'en-tête `Authorization: Bearer {{token}}` :
+  - `Posts — List (global)` → `GET {{baseUrl}}/posts?scope=global&limit={{limit}}`
+  - `Posts — List (me)` → `GET {{baseUrl}}/posts?scope=me&limit={{limit}}`
+  - `Users — Posts (by userId)` → `GET {{baseUrl}}/users/{{targetUserId}}/posts?limit={{limit}}`
+- Scripts de test Postman (pour les trois) :
+  ```javascript
+  pm.test('Status 200', () => pm.response.code === 200);
+  const json = pm.response.json();
+  pm.test('Response shape', () => {
+    pm.expect(json).to.have.property('data').that.is.an('array');
+    pm.expect(json).to.have.property('nextCursor');
+  });
+  ```
+- Variables d’environnement nécessaires : `limit` (ex: `2`) et `targetUserId` (à renseigner manuellement).
+
+### Exemples cURL
+```bash
+curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
+curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
+curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
+```
 
 ## Étape 6 — Posts: Like
 - **Objectif** : exposer l'endpoint `POST /posts/{postId}/like` pour ajouter un like authentifié et renvoyer le compteur associé.
