@@ -35,9 +35,6 @@ jobs:
       - name: Copy .env
         run: cp .env.example .env
 
-      - name: Copy .env to prisma
-        run: cp .env prisma/.env
-
       - name: Generate Prisma client
         working-directory: prisma
         run: npx prisma generate --schema=./schema.prisma
