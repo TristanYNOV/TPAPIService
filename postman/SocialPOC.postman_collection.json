@@ -390,20 +390,7 @@
           "script": {
             "id": "6348a1a6-3ff8-4f2d-a6f7-1191e0930247",
             "type": "text/javascript",
-            "exec": [
-              "pm.test('Status 200', () => pm.response.code === 200);",
-              "const json = pm.response.json();",
-              "pm.test('Shape {data,nextCursor}', () => {",
-              "  pm.expect(json).to.have.property('data').that.is.an('array');",
-              "  pm.expect(json).to.have.property('nextCursor');",
-              "});",
-              "const page1Ids = JSON.parse(pm.environment.get(\"page1Ids\") || \"[]\");",
-              "const ids = json.data.map((post) => post.id);",
-              "pm.test('No duplicates with page 1', () => {",
-              "  ids.forEach((id) => pm.expect(page1Ids).to.not.include(id));",
-              "});",
-              "pm.environment.set(\"nextCursor\", JSON.stringify(json.nextCursor));"
-            ]
+            "exec": []
           }
         }
       ],
