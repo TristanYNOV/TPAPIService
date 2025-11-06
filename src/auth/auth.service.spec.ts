@@ -1,18 +1,30 @@
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 jest.mock('argon2', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
+  verify: jest.fn(),
 }));
 
-const { hash } = jest.requireMock('argon2');
+const { hash, verify } = jest.requireMock('argon2');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: { user: { findUnique: jest.Mock; create: jest.Mock } };
+  let prisma: {
+    user: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+    };
+  };
+  let jwtService: { signAsync: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -22,7 +34,11 @@ describe('AuthService', () => {
       },
     };
 
-    service = new AuthService(prisma as unknown as PrismaService);
+    jwtService = {
+      signAsync: jest.fn(),
+    };
+
+    service = new AuthService(prisma as unknown as PrismaService, jwtService as any);
   });
 
   afterEach(() => {
@@ -89,5 +105,61 @@ describe('AuthService', () => {
     });
 
     await expect(service.register(dto)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('should return an access token when credentials are valid', async () => {
+    const dto = plainToInstance(LoginDto, {
+      email: 'john.doe@example.com',
+      password: 'password123',
+    });
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'john.doe@example.com',
+      password: 'hashed-password',
+    });
+
+    verify.mockResolvedValue(true);
+    jwtService.signAsync.mockResolvedValue('jwt-token');
+
+    const result = await service.login(dto);
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: 'john.doe@example.com' },
+    });
+    expect(verify).toHaveBeenCalledWith('hashed-password', 'password123');
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: 'user-id',
+      email: 'john.doe@example.com',
+    });
+    expect(result).toEqual({ access_token: 'jwt-token' });
+  });
+
+  it('should throw UnauthorizedException when credentials are invalid', async () => {
+    const dto = plainToInstance(LoginDto, {
+      email: 'john.doe@example.com',
+      password: 'password123',
+    });
+
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(service.login(dto)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('should throw UnauthorizedException when password is incorrect', async () => {
+    const dto = plainToInstance(LoginDto, {
+      email: 'john.doe@example.com',
+      password: 'password123',
+    });
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'john.doe@example.com',
+      password: 'hashed-password',
+    });
+
+    verify.mockResolvedValue(false);
+
+    await expect(service.login(dto)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
