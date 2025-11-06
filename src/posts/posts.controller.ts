@@ -12,7 +12,7 @@ import {
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ListPostsQueryDto } from './dto/list-posts.query';
+import { ListPostsQueryDto, PostsFeedScope } from './dto/list-posts.query';
 
 interface JwtPayload {
   sub: string;
@@ -29,13 +29,16 @@ export class PostsController {
     return this.postsService.create(req.user.sub, body);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findMany(@Query() query: ListPostsQueryDto) {
-    const limit = Number(query.limit ?? 10);
+  findAll(@Request() req: { user: JwtPayload }, @Query() query: ListPostsQueryDto) {
+    const scope: PostsFeedScope = query.scope ?? 'global';
+    const filter = scope === 'me' ? { authorId: req.user.sub } : undefined;
 
-    return this.postsService.findMany({
-      limit,
+    return this.postsService.findAll({
+      limit: query.limit,
       cursor: query.cursor,
+      filter,
     });
   }
 

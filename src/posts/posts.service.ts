@@ -33,34 +33,29 @@ export class PostsService {
     });
   }
 
-  async findMany(params: { limit: number; cursor?: string | undefined }) {
-    const { limit, cursor } = params;
-
+  async findAll(params: {
+    limit?: number;
+    cursor?: string;
+    filter?: { authorId?: string };
+  }) {
+    const limit = params.limit ?? 10;
     const parsedLimit = Number(limit);
 
-    if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
       throw new BadRequestException('Invalid limit');
     }
 
-    if (cursor) {
-      const exists = await this.prisma.post.findUnique({
-        where: { id: cursor },
-        select: { id: true },
-      });
+    const where: Prisma.PostWhereInput | undefined = params.filter?.authorId
+      ? { authorId: params.filter.authorId }
+      : undefined;
 
-      if (!exists) {
-        throw new BadRequestException('Invalid cursor');
-      }
-    }
-
-    const take = parsedLimit + 1;
-
-    const query: Prisma.PostFindManyArgs = {
-      take,
+    const posts = await this.prisma.post.findMany({
+      where,
       orderBy: [
         { createdAt: 'desc' },
         { id: 'desc' },
       ],
+      take: parsedLimit,
       include: {
         author: {
           select: {
@@ -74,22 +69,11 @@ export class PostsService {
           },
         },
       },
-    };
-
-    if (cursor) {
-      query.cursor = { id: cursor };
-      query.skip = 1;
-    }
-
-    const posts = await this.prisma.post.findMany(query);
-
-    const hasNextPage = posts.length > parsedLimit;
-    const data = hasNextPage ? posts.slice(0, parsedLimit) : posts;
-    const nextCursor = hasNextPage ? data[data.length - 1].id : null;
+    });
 
     return {
-      data,
-      nextCursor,
+      data: posts,
+      nextCursor: null,
     };
   }
 

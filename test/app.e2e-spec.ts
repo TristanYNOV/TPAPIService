@@ -3,6 +3,10 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'e2e-secret';
+process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '15m';
+process.env.DATABASE_URL = process.env.DATABASE_URL ?? 'file:./prisma/dev.db';
+
 describe('AppController (e2e)', () => {
   let app: NestFastifyApplication;
 

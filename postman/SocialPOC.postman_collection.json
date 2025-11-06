@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create), 5 (posts/list) et 6 (posts/like)."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create), 5 (posts/list), 6 (posts/like) et 7 (posts/feed scopes)."
   },
   "item": [
     {
@@ -252,7 +252,13 @@
       ],
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/posts?limit=2",
           "host": [
@@ -275,7 +281,13 @@
       "name": "Posts — List (page 2)",
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/posts?limit=2&cursor={{nextCursor}}",
           "host": [
@@ -292,6 +304,154 @@
             {
               "key": "cursor",
               "value": "{{nextCursor}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — List (global)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "b02f47d6-53a8-4d8a-9a6e-0c15f1d16b6a",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
+              "const json = pm.response.json();",
+              "pm.test('Response shape', () => {",
+              "  pm.expect(json).to.have.property('data').that.is.an('array');",
+              "  pm.expect(json).to.have.property('nextCursor');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts?scope=global&limit={{limit}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "scope",
+              "value": "global"
+            },
+            {
+              "key": "limit",
+              "value": "{{limit}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — List (me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "5c142d94-4e6a-4f1a-b78a-5d60d7999e65",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
+              "const json = pm.response.json();",
+              "pm.test('Response shape', () => {",
+              "  pm.expect(json).to.have.property('data').that.is.an('array');",
+              "  pm.expect(json).to.have.property('nextCursor');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts?scope=me&limit={{limit}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "scope",
+              "value": "me"
+            },
+            {
+              "key": "limit",
+              "value": "{{limit}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Users — Posts (by userId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "4f6a0ca0-449a-469b-9d45-9c1e3b38679f",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
+              "const json = pm.response.json();",
+              "pm.test('Response shape', () => {",
+              "  pm.expect(json).to.have.property('data').that.is.an('array');",
+              "  pm.expect(json).to.have.property('nextCursor');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/{{targetUserId}}/posts?limit={{limit}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "{{targetUserId}}",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "{{limit}}"
             }
           ]
         }
