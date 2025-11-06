@@ -178,6 +178,7 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=
 - **Format du cursor** : l'API retourne un objet JSON `{ "createdAt": "<ISO-8601>", "id": "<cuid>" }`. Pour charger la page suivante, transmettez ce JSON stringifié dans le paramètre `cursor`.
 - **Exemple encodé** : `GET /posts?limit=2&cursor=%7B%22createdAt%22%3A%222024-05-01T11%3A00%3A00.000Z%22%2C%22id%22%3A%22clx123example%22%7D`.
 - **Réponse standardisée** : `{ "data": [...], "nextCursor": { createdAt, id } | null }`. Lorsque `nextCursor` vaut `null`, il n'y a plus de page suivante.
+- **Migrations & génération Prisma** : appliquez la migration avec `npx prisma migrate deploy` (ou `npx prisma migrate dev`) puis exécutez `npx prisma generate` pour rafraîchir le client Prisma. Sans cette étape, TypeScript n'a pas accès à la clé composite `createdAt_id` utilisée par la pagination.
 
 ## Étape 6 — Posts: Like
 - **Objectif** : exposer l'endpoint `POST /posts/{postId}/like` pour ajouter un like authentifié et renvoyer le compteur associé.

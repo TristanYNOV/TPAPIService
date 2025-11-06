@@ -5,6 +5,13 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
+type PostCompositeCursor = Prisma.PostWhereUniqueInput & {
+  createdAt_id?: {
+    createdAt: Date;
+    id: string;
+  };
+};
+
 @Injectable()
 export class PostsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -49,7 +56,7 @@ export class PostsService {
       ? { authorId: params.filter.authorId }
       : undefined;
 
-    let cursor: Prisma.PostWhereUniqueInput | undefined;
+    let cursor: PostCompositeCursor | undefined;
 
     if (params.cursor) {
       const { createdAt, id } = params.cursor;
@@ -69,7 +76,7 @@ export class PostsService {
           createdAt: createdAtDate,
           id,
         },
-      } satisfies Prisma.PostWhereUniqueInput;
+      } satisfies PostCompositeCursor;
     }
 
     const posts = await this.prisma.post.findMany({
