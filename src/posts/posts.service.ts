@@ -61,10 +61,6 @@ export class PostsService {
     if (params.cursor) {
       const { createdAt, id } = params.cursor;
 
-      if (typeof createdAt !== 'string' || typeof id !== 'string') {
-        throw new BadRequestException('Invalid cursor');
-      }
-
       const createdAtDate = new Date(createdAt);
 
       if (Number.isNaN(createdAtDate.getTime())) {
