@@ -22,27 +22,6 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Copy .env from example (and ensure required keys)
-        shell: bash
-        run: |
-          if [ -f ".env.example" ]; then
-            cp .env.example .env
-          else
-            {
-              echo 'DATABASE_URL="file:./dev.db"'
-              echo 'JWT_SECRET="change-me"'
-              echo 'JWT_EXPIRES_IN="1d"'
-            } > .env
-          fi
-
-          # Garantir les 3 clés si absentes dans .env.example
-          grep -q '^DATABASE_URL=' .env || echo 'DATABASE_URL="file:./dev.db"' >> .env
-          grep -q '^JWT_SECRET=' .env || echo 'JWT_SECRET="change-me"' >> .env
-          grep -q '^JWT_EXPIRES_IN=' .env || echo 'JWT_EXPIRES_IN="1d"' >> .env
-
-          echo "Final .env content (JWT_SECRET masked):"
-          sed -e 's/^JWT_SECRET=.*/JWT_SECRET="***"/' .env
-
       - name: Debug workspace (optional)
         run: |
           pwd
@@ -54,10 +33,12 @@ jobs:
           grep '^JWT_SECRET=' .env | sed 's/.*/JWT_SECRET="***"/' || true
 
       - name: Generate Prisma client
-        run: npx prisma generate --schema=./prisma/schema.prisma
+        working-directory: prisma
+        run: npx prisma generate --schema=./schema.prisma
 
       - name: Prepare DB (SQLite)
-        run: npx prisma migrate dev --name init --schema=./prisma/schema.prisma
+        working-directory: prisma
+        run: npx prisma migrate dev --name init --schema=./schema.prisma
 
       - name: Run Postman collection (start app, then newman)
         run: npm run ci:e2e
