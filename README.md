@@ -13,6 +13,7 @@
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
 - [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
+- [Étape 2 — Auth: Register](#étape-2--auth-register)
 
 ## Aperçu
 Cette application utilise [NestJS](https://nestjs.com) avec l'adaptateur Fastify et Prisma pour la couche d'accès aux données. Elle servira de socle pour construire l'API REST sécurisée du POC Social.
@@ -112,6 +113,7 @@ npx prisma generate
 
 ## Changelog
 - Étape 0 — Mise en place de la base documentaire
+- Étape 2 — Auth: Register
 
 ## Étape 0 — Mise en place de la base documentaire
 - **Objectifs** : fournir un guide de démarrage (prérequis, installation, scripts), préparer les fichiers Postman et structurer la documentation.
@@ -133,3 +135,24 @@ npx prisma generate
 - Clé JWT d'exemple (`JWT_SECRET`) à remplacer par une valeur forte avant toute mise en prod.
 - Pas de mécanisme d'authentification ni de validation configuré à cette étape.
 - Fichier `.env` à protéger (ne pas versionner, limiter les accès).
+
+## Étape 2 — Auth: Register
+- **Objectif** : exposer `POST /auth/register` pour créer un utilisateur avec email unique et mot de passe sécurisé (hash Argon2).
+- **Règles de validation** :
+  - `email` : format valide, unique.
+  - `password` : chaîne d'au moins 8 caractères.
+  - Requête invalide → `400 Bad Request`, email déjà pris → `409 Conflict`.
+- **Réponse** : `201 Created` avec `{ id, email, createdAt }` (jamais de mot de passe renvoyé).
+- **Tests** :
+  - `npm run test` — inclut les tests unitaires du service (création ok, 409 si doublon, 400 si payload invalide).
+  - `npm run test:e2e` — vérifie la réussite du register et la réponse épurée.
+- **Bloc Postman** :
+  - Nouvelle requête `Auth — Register` (POST `{{baseUrl}}/auth/register`).
+  - Body JSON : `{ "email": "alice@example.com", "password": "password123" }`.
+  - Attendu `201` avec `{ "id": "...", "email": "alice@example.com", "createdAt": "..." }`.
+- **Vérifications manuelles recommandées** :
+  - `curl -X POST {{baseUrl}}/auth/register -H 'Content-Type: application/json' -d '{"email":"alice@example.com","password":"password123"}'`.
+  - Requête Postman `Auth — Register`.
+- **Risques sécurité résiduels** :
+  - Attaques par force brute : rate-limit actif sur `/auth/*` (Fastify rate-limit).
+  - Toujours éviter d'exposer le hash Argon2 en réponse ou dans les journaux.

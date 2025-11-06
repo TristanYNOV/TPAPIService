@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étape 0 — requête placeholder."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 0 et 2 (Auth — Register)."
   },
   "item": [
     {
@@ -25,6 +25,34 @@
           ],
           "path": [
             "placeholder"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth — Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "register"
           ]
         }
       },
