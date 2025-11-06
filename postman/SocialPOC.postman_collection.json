@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create) et 5 (posts/list)."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create), 5 (posts/list) et 6 (posts/like)."
   },
   "item": [
     {
@@ -205,6 +205,31 @@
           ],
           "path": [
             "posts"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — Like",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/posts/{{postId}}/like",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts",
+            "{{postId}}",
+            "like"
           ]
         }
       },

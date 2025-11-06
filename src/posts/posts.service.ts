@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -91,5 +91,28 @@ export class PostsService {
       data,
       nextCursor,
     };
+  }
+
+  async like(postId: string, userId: string) {
+    const exists = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true },
+    });
+
+    if (!exists) {
+      throw new NotFoundException('Post not found');
+    }
+
+    await this.prisma.like.upsert({
+      where: { userId_postId: { userId, postId } },
+      update: {},
+      create: { userId, postId },
+    });
+
+    const likes = await this.prisma.like.count({
+      where: { postId },
+    });
+
+    return { likes };
   }
 }

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -27,5 +37,15 @@ export class PostsController {
       limit,
       cursor: query.cursor,
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':postId/like')
+  @HttpCode(200)
+  like(
+    @Param('postId') postId: string,
+    @Request() req: { user: JwtPayload },
+  ) {
+    return this.postsService.like(postId, req.user.sub);
   }
 }
