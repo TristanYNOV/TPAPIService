@@ -22,10 +22,9 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Copy .env
+      - name: Copy .env from example (and ensure required keys)
         shell: bash
         run: |
-          # 1) Copier .env.example -> .env si présent, sinon créer un .env minimal
           if [ -f ".env.example" ]; then
             cp .env.example .env
           else
@@ -36,30 +35,23 @@ jobs:
             } > .env
           fi
 
-          # 2) S'assurer que DATABASE_URL et JWT_EXPIRES_IN existent (valeurs par défaut si absentes)
+          # Garantir les 3 clés si absentes dans .env.example
           grep -q '^DATABASE_URL=' .env || echo 'DATABASE_URL="file:./dev.db"' >> .env
+          grep -q '^JWT_SECRET=' .env || echo 'JWT_SECRET="change-me"' >> .env
           grep -q '^JWT_EXPIRES_IN=' .env || echo 'JWT_EXPIRES_IN="1d"' >> .env
 
-          # 3) Si un secret GitHub JWT_SECRET est fourni, l'injecter/écraser proprement
-          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
-            if grep -q '^JWT_SECRET=' .env; then
-              sed -i 's/^JWT_SECRET=.*/JWT_SECRET="${{ secrets.JWT_SECRET }}"/' .env
-            else
-              echo 'JWT_SECRET="${{ secrets.JWT_SECRET }}"' >> .env
-            fi
-          fi
+          echo "Final .env content (JWT_SECRET masked):"
+          sed -e 's/^JWT_SECRET=.*/JWT_SECRET="***"/' .env
 
-          echo "Final .env content (secrets masqués par GitHub):"
-          sed 's/^JWT_SECRET=.*/JWT_SECRET="***"/' .env
-
-      # (Optionnel) Debug rapide pour vérifier le cwd et la présence des fichiers
-      - name: Debug workspace
+      - name: Debug workspace (optional)
         run: |
           pwd
           ls -la
           ls -la prisma || true
-          echo "DATABASE_URL from .env (masked in logs by GitHub):"
+          echo "--- .env preview (masked) ---"
           grep '^DATABASE_URL=' .env || true
+          grep '^JWT_EXPIRES_IN=' .env || true
+          grep '^JWT_SECRET=' .env | sed 's/.*/JWT_SECRET="***"/' || true
 
       - name: Generate Prisma client
         run: npx prisma generate --schema=./prisma/schema.prisma
