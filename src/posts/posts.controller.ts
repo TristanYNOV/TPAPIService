@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -35,9 +36,33 @@ export class PostsController {
     const scope: PostsFeedScope = query.scope ?? 'global';
     const filter = scope === 'me' ? { authorId: req.user.sub } : undefined;
 
+    let cursor: { createdAt: string; id: string } | undefined;
+
+    if (query.cursor) {
+      try {
+        const parsed = JSON.parse(query.cursor);
+
+        if (
+          !parsed ||
+          typeof parsed !== 'object' ||
+          typeof parsed.createdAt !== 'string' ||
+          typeof parsed.id !== 'string'
+        ) {
+          throw new Error('Invalid cursor');
+        }
+
+        cursor = {
+          createdAt: parsed.createdAt,
+          id: parsed.id,
+        };
+      } catch (error) {
+        throw new BadRequestException('Invalid cursor');
+      }
+    }
+
     return this.postsService.findAll({
       limit: query.limit,
-      cursor: query.cursor,
+      cursor,
       filter,
     });
   }

@@ -24,6 +24,8 @@ model Post {
   content   String
   createdAt DateTime @default(now())
   likes     Like[]
+
+  @@unique([createdAt, id], name: "createdAt_id")
 }
 
 model Like {

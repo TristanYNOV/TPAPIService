@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 8 — Posts: Keyset pagination](#étape-8--posts-keyset-pagination)
 - [Étape 7 — Posts: Feed scopes](#étape-7--posts-feed-scopes)
 - [Étape 6 — Posts: Like](#étape-6--posts-like)
 - [Étape 5 — Posts: List](#étape-5--posts-list)
@@ -118,6 +119,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 8 — Posts: Keyset pagination
 - Étape 7 — Posts: Feed scopes
 - Étape 6 — Posts: Like
 - Étape 5 — Posts: List
@@ -169,6 +171,13 @@ curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=global&limit=2"
 curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/posts?scope=me&limit=2"
 curl -H "Authorization: Bearer $TOKEN" "{{baseUrl}}/users/<USER_ID>/posts?limit=2"
 ```
+
+## Étape 8 — Posts: Keyset pagination
+- **Objectif** : garantir un scroll infini sans doublon en ordonnant les posts par `createdAt DESC, id DESC` et en utilisant un curseur composite `{ createdAt, id }`.
+- **Pourquoi ce couple est unique** : deux posts peuvent partager la même seconde de création mais pas la même paire `(createdAt, id)` ; la contrainte `@@unique([createdAt, id], name: "createdAt_id")` impose un ordre strictement décroissant et stable, même si de nouveaux posts apparaissent entre deux requêtes.
+- **Format du cursor** : l'API retourne un objet JSON `{ "createdAt": "<ISO-8601>", "id": "<cuid>" }`. Pour charger la page suivante, transmettez ce JSON stringifié dans le paramètre `cursor`.
+- **Exemple encodé** : `GET /posts?limit=2&cursor=%7B%22createdAt%22%3A%222024-05-01T11%3A00%3A00.000Z%22%2C%22id%22%3A%22clx123example%22%7D`.
+- **Réponse standardisée** : `{ "data": [...], "nextCursor": { createdAt, id } | null }`. Lorsque `nextCursor` vaut `null`, il n'y a plus de page suivante.
 
 ## Étape 6 — Posts: Like
 - **Objectif** : exposer l'endpoint `POST /posts/{postId}/like` pour ajouter un like authentifié et renvoyer le compteur associé.

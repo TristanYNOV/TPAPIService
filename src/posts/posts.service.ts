@@ -35,7 +35,7 @@ export class PostsService {
 
   async findAll(params: {
     limit?: number;
-    cursor?: string;
+    cursor?: { createdAt: string; id: string };
     filter?: { authorId?: string };
   }) {
     const limit = params.limit ?? 10;
@@ -49,13 +49,38 @@ export class PostsService {
       ? { authorId: params.filter.authorId }
       : undefined;
 
+    let cursor: Prisma.PostWhereUniqueInput | undefined;
+
+    if (params.cursor) {
+      const { createdAt, id } = params.cursor;
+
+      if (typeof createdAt !== 'string' || typeof id !== 'string') {
+        throw new BadRequestException('Invalid cursor');
+      }
+
+      const createdAtDate = new Date(createdAt);
+
+      if (Number.isNaN(createdAtDate.getTime())) {
+        throw new BadRequestException('Invalid cursor');
+      }
+
+      cursor = {
+        createdAt_id: {
+          createdAt: createdAtDate,
+          id,
+        },
+      } satisfies Prisma.PostWhereUniqueInput;
+    }
+
     const posts = await this.prisma.post.findMany({
       where,
       orderBy: [
         { createdAt: 'desc' },
         { id: 'desc' },
       ],
-      take: parsedLimit,
+      cursor,
+      skip: cursor ? 1 : undefined,
+      take: parsedLimit + 1,
       include: {
         author: {
           select: {
@@ -71,9 +96,19 @@ export class PostsService {
       },
     });
 
+    const hasNextPage = posts.length > parsedLimit;
+    const data = posts.slice(0, parsedLimit);
+
+    const nextCursor = hasNextPage
+      ? {
+          createdAt: data[data.length - 1].createdAt.toISOString(),
+          id: data[data.length - 1].id,
+        }
+      : null;
+
     return {
-      data: posts,
-      nextCursor: null,
+      data,
+      nextCursor,
     };
   }
 
