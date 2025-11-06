@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 5 — Posts: List](#étape-5--posts-list)
 - [Étape 4 — Posts: Create](#étape-4--posts-create)
 - [Étape 3 — Auth: Login](#étape-3--auth-login)
 - [Étape 2 — Auth: Register](#étape-2--auth-register)
@@ -115,11 +116,50 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 5 — Posts: List
 - Étape 4 — Posts: Create
 - Étape 3 — Auth: Login
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 5 — Posts: List
+- **Objectif** : exposer l'endpoint `GET /posts` avec une pagination `cursor`/`limit` ordonnée par `createdAt DESC`, renvoyant `{ data, nextCursor }`.
+- **Query params** :
+  - `limit` *(optionnel, défaut = 10)* : nombre maximum d'éléments renvoyés. Doit être un entier ≥ 1.
+  - `cursor` *(optionnel)* : identifiant du dernier post récupéré. Permet de charger la page suivante.
+- **Réponse attendue (200)** :
+  ```json
+  {
+    "data": [
+      {
+        "id": "...",
+        "content": "...",
+        "createdAt": "2024-04-01T08:00:00.000Z",
+        "author": {
+          "id": "...",
+          "email": "author@example.com"
+        },
+        "_count": {
+          "likes": 2
+        }
+      }
+    ],
+    "nextCursor": "cmhxxxxxxxxxxxxx" // null s'il n'y a plus de page
+  }
+  ```
+- **Tests** :
+  ```bash
+  npm run test:e2e -- posts.e2e-spec.ts
+  ```
+  Les seeds vérifient que la limite est respectée, que l'ordre `createdAt DESC` est conservé et que `nextCursor` est présent lorsqu'une page suivante existe.
+- **Postman** : nouvelles requêtes
+  - `Posts — List (page 1)` (`GET {{baseUrl}}/posts?limit=2`) avec un script de test `pm.environment.set("nextCursor", json.nextCursor);`.
+  - `Posts — List (page 2)` (`GET {{baseUrl}}/posts?limit=2&cursor={{nextCursor}}`).
+- **Vérifications manuelles** :
+  - `curl "{{baseUrl}}/posts?limit=5"`
+  - Enchaîner les requêtes Postman `Posts — List (page 1)` puis `Posts — List (page 2)` pour valider la pagination.
+- **Risques sécurité résiduels** : veiller à ne pas exposer de données sensibles dans l'objet `author` (limité à `{ id, email }`) et surveiller les limites de pagination pour éviter les abus.
 
 ## Étape 3 — Auth: Login
 - **Objectif** : exposer l'endpoint `POST /auth/login` qui renvoie un JWT signé (`{ "access_token": "..." }`) contenant le payload `{ sub, email }` et dont la durée de validité dépend des variables d'environnement `JWT_SECRET` et `JWT_EXPIRES_IN`.
