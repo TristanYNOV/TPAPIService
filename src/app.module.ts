@@ -3,17 +3,15 @@ import { PrismaService } from './prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import {ConfigModule} from "@nestjs/config";
+import { PostsModule } from './posts/posts.module';
 
 @Module({
   imports: [
-      // DO NOT REMOVE --> Used to load .env after start
-    ConfigModule.forRoot({
-      isGlobal: true,          // charge .env au démarrage (globalement)
-      envFilePath: '.env',     // racine du projet
-    }),
+    // Les variables d'environnement sont chargées via `dotenv/config` dans main.ts
     AuthModule,
-  ],  providers: [PrismaService, AppService],
+    PostsModule,
+  ],
+  providers: [PrismaService, AppService],
   controllers: [AppController],
 })
 export class AppModule {}

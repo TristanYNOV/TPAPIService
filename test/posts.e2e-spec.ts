@@ -16,7 +16,7 @@ execSync('npx prisma migrate deploy', {
   },
 });
 
-describe('AuthController (e2e)', () => {
+describe('PostsController (e2e)', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService;
 
@@ -43,35 +43,44 @@ describe('AuthController (e2e)', () => {
     await app.close();
   });
 
-  it('POST /auth/register should return a sanitized user payload', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'alice@example.com', password: 'password123' })
-      .expect(201);
-
-    expect(response.body).toMatchObject({
-      email: 'alice@example.com',
-    });
-    expect(response.body).toHaveProperty('id');
-    expect(response.body).toHaveProperty('createdAt');
-    expect(typeof response.body.id).toBe('string');
-    expect(typeof response.body.createdAt).toBe('string');
-    expect(response.body).not.toHaveProperty('password');
+  it('POST /posts should return 401 when no token is provided', async () => {
+    await request(app.getHttpServer())
+      .post('/posts')
+      .send({ content: 'Unauthorized post' })
+      .expect(401);
   });
 
-  it('POST /auth/login should return a JWT access token when credentials are valid', async () => {
+  it('POST /posts should create a post when a valid token is provided', async () => {
     await request(app.getHttpServer())
       .post('/auth/register')
       .send({ email: 'alice@example.com', password: 'password123' })
       .expect(201);
 
-    const response = await request(app.getHttpServer())
+    const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'alice@example.com', password: 'password123' })
       .expect(200);
 
-    expect(response.body).toHaveProperty('access_token');
-    expect(typeof response.body.access_token).toBe('string');
-    expect(response.body.access_token.length).toBeGreaterThan(0);
+    const token = loginResponse.body.access_token;
+
+    const response = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: 'Hello world' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      content: 'Hello world',
+      author: {
+        email: 'alice@example.com',
+      },
+    });
+
+    expect(response.body).toHaveProperty('id');
+    expect(response.body).toHaveProperty('createdAt');
+    expect(response.body.author).toHaveProperty('id');
+    expect(typeof response.body.id).toBe('string');
+    expect(typeof response.body.createdAt).toBe('string');
+    expect(typeof response.body.author.id).toBe('string');
   });
 });

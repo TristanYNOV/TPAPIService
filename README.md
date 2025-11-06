@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 4 — Posts: Create](#étape-4--posts-create)
 - [Étape 3 — Auth: Login](#étape-3--auth-login)
 - [Étape 2 — Auth: Register](#étape-2--auth-register)
 - [Étape 0 — Mise en place de la base documentaire](#étape-0--mise-en-place-de-la-base-documentaire)
@@ -114,6 +115,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 4 — Posts: Create
 - Étape 3 — Auth: Login
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
@@ -201,3 +203,27 @@ npx prisma generate
   - Requête Postman `Auth — Register` (voir collection mise à jour).
 - **Postman** : nouvelle requête `Auth — Register` (`POST {{baseUrl}}/auth/register`) avec body JSON `{ "email": "alice@example.com", "password": "password123" }`. La réponse attendue est le payload utilisateur sans mot de passe.
 - **Risques sécurité résiduels** : surveiller les tentatives de brute force (limitation de débit déjà en place), garantir le stockage chiffré des secrets Prisma (`DATABASE_URL`) et vérifier que seuls les champs autorisés sont renvoyés côté API.
+## Étape 4 — Posts: Create
+- **Objectif** : permettre à un utilisateur authentifié de créer un post via `POST /posts` en fournissant un contenu non vide.
+- **Sécurité** : l'en-tête `Authorization: Bearer {{token}}` est obligatoire (token issu de `/auth/login`). Une absence de token déclenche `401 Unauthorized`.
+- **Payload attendu** : `{ "content": "Votre message" }`.
+- **Réponse attendue (201)** : `{ "id": "...", "content": "Votre message", "createdAt": "...", "author": { "id": "...", "email": "alice@example.com" } }`.
+- **Tests** :
+  - Unitaire (validation DTO) :
+    ```bash
+    npm run test -- posts/dto/create-post.dto.spec.ts
+    ```
+  - End-to-end :
+    ```bash
+    npm run test:e2e -- posts.e2e-spec.ts
+    ```
+- **Postman** : nouvelle requête `Posts — Create` (`POST {{baseUrl}}/posts`) avec body JSON `{ "content": "Hello world" }`, en-tête `Authorization: Bearer {{token}}` et script de test enregistrant l'identifiant du post :
+  ```javascript
+  const json = pm.response.json();
+  pm.environment.set("postId", json.id);
+  ```
+- **Vérifications manuelles** :
+  - `curl -X POST {{baseUrl}}/posts -H 'Authorization: Bearer {{token}}' -H 'Content-Type: application/json' -d '{"content":"Hello world"}'`
+  - Exécuter la requête Postman `Posts — Create` après authentification.
+- **Risques sécurité résiduels** : conserver les mots de passe des utilisateurs hors de toute réponse API (seules les informations publiques de l'auteur sont renvoyées) et veiller à la confidentialité du token JWT.
+
