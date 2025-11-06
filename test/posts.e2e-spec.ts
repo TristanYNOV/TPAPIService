@@ -166,6 +166,70 @@ describe('PostsController (e2e)', () => {
       );
     });
 
+    it('should keep pages free of duplicates when new posts arrive between requests', async () => {
+      const [{ token, user: alice }, { user: bob }] = await Promise.all([
+        registerAndLogin('alice-keyset@example.com'),
+        registerAndLogin('bob-keyset@example.com'),
+      ]);
+
+      const timestamps = [
+        '2024-05-01T12:00:00.000Z',
+        '2024-05-01T11:00:00.000Z',
+        '2024-05-01T10:00:00.000Z',
+        '2024-05-01T09:00:00.000Z',
+      ];
+
+      const [postA, postB, postC, postD] = await Promise.all(
+        timestamps.map((iso, index) =>
+          prisma.post.create({
+            data: {
+              authorId: index % 2 === 0 ? alice.id : bob.id,
+              content: `Seed post ${index + 1}`,
+              createdAt: new Date(iso),
+            },
+          }),
+        ),
+      );
+
+      const page1Response = await request(app.getHttpServer())
+        .get('/posts')
+        .query({ limit: 2 })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(page1Response.body.data).toHaveLength(2);
+      const page1Ids = page1Response.body.data.map((post: any) => post.id);
+      expect(page1Ids).toEqual([postA.id, postB.id]);
+      expect(page1Response.body.nextCursor).toEqual({
+        createdAt: postB.createdAt.toISOString(),
+        id: postB.id,
+      });
+
+      const freshPost = await prisma.post.create({
+        data: {
+          authorId: alice.id,
+          content: 'Inserted between pages',
+          createdAt: new Date('2024-05-01T13:00:00.000Z'),
+        },
+      });
+
+      expect(freshPost.createdAt.getTime()).toBeGreaterThan(postA.createdAt.getTime());
+
+      const page2Response = await request(app.getHttpServer())
+        .get('/posts')
+        .query({ limit: 2, cursor: JSON.stringify(page1Response.body.nextCursor) })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const page2Ids = page2Response.body.data.map((post: any) => post.id);
+      expect(page2Ids).toHaveLength(2);
+      expect(page2Ids).toEqual([postC.id, postD.id]);
+      page2Ids.forEach((id: string) => {
+        expect(page1Ids).not.toContain(id);
+      });
+      expect(page2Response.body.nextCursor).toBeNull();
+    });
+
     it('should list only the current user posts for the me scope', async () => {
       const [{ token: aliceToken, user: alice }, { user: bob }] = await Promise.all([
         registerAndLogin('alice2@example.com'),

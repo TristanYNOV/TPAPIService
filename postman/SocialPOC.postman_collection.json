@@ -3,7 +3,7 @@
     "_postman_id": "00000000-0000-0000-0000-000000000000",
     "name": "SocialPOC",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create), 5 (posts/list), 6 (posts/like) et 7 (posts/feed scopes)."
+    "description": "Collection Postman pour l'API REST SocialPOC. Étapes 1 (smoke), 2 (auth/register), 3 (auth/login), 4 (posts/create), 5 (posts/list), 6 (posts/like), 7 (posts/feed scopes) et 8 (posts/keyset pagination)."
   },
   "item": [
     {
@@ -236,7 +236,7 @@
       "response": []
     },
     {
-      "name": "Posts — List (page 1)",
+      "name": "Posts — List (Page 1)",
       "event": [
         {
           "listen": "test",
@@ -244,8 +244,11 @@
             "id": "9f4132ac-73cb-49a3-8b7d-3baea7a1e0c7",
             "type": "text/javascript",
             "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
               "const json = pm.response.json();",
-              "pm.environment.set(\"nextCursor\", json.nextCursor);"
+              "const ids = json.data.map((post) => post.id);",
+              "pm.environment.set(\"page1Ids\", JSON.stringify(ids));",
+              "pm.environment.set(\"nextCursor\", JSON.stringify(json.nextCursor));"
             ]
           }
         }
@@ -260,7 +263,7 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/posts?limit=2",
+          "raw": "{{baseUrl}}/posts?limit={{limit}}",
           "host": [
             "{{baseUrl}}"
           ],
@@ -270,7 +273,7 @@
           "query": [
             {
               "key": "limit",
-              "value": "2"
+              "value": "{{limit}}"
             }
           ]
         }
@@ -278,7 +281,70 @@
       "response": []
     },
     {
-      "name": "Posts — List (page 2)",
+      "name": "Posts — Insert between pages",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "2b7f8209-5589-4cf7-8fae-235da9ed20f9",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.code === 201);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"content\": \"Inserted between pages\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "posts"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Posts — List (NextPage)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "id": "f0e6d2de-830e-4f4d-9a77-1fbe6a2f3c5a",
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.code === 200);",
+              "const json = pm.response.json();",
+              "const page1Ids = JSON.parse(pm.environment.get(\"page1Ids\") || '[]');",
+              "const ids = json.data.map((post) => post.id);",
+              "pm.test('No duplicates with page 1', () => {",
+              "  ids.forEach((id) => pm.expect(page1Ids).to.not.include(id));",
+              "});",
+              "pm.environment.set(\"nextCursor\", JSON.stringify(json.nextCursor));"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "GET",
         "header": [
@@ -289,7 +355,7 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/posts?limit=2&cursor={{nextCursor}}",
+          "raw": "{{baseUrl}}/posts?limit={{limit}}&cursor={{nextCursor}}",
           "host": [
             "{{baseUrl}}"
           ],
@@ -299,7 +365,7 @@
           "query": [
             {
               "key": "limit",
-              "value": "2"
+              "value": "{{limit}}"
             },
             {
               "key": "cursor",
