@@ -71,6 +71,7 @@ export class AuthService {
     const payload = {
       sub: user.id,
       email: user.email,
+      client_id: 'gravitee-api',
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
