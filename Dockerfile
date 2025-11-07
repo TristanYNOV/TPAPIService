@@ -3,8 +3,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-ENV NODE_ENV=production
-
+# Install all dependencies (including dev) required for building the project
 COPY package*.json ./
 RUN npm ci
 
