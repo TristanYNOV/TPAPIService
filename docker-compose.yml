@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.docker
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  api-dev:
+    image: node:20-alpine
+    working_dir: /app
+    command: npm run start:dev
+    env_file:
+      - .env.docker
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - ./data:/data
+    profiles: ["dev"]
