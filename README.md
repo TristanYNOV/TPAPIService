@@ -12,6 +12,7 @@
 - [Scripts npm](#scripts-npm)
 - [Postman — démarrage](#postman--démarrage)
 - [Changelog](#changelog)
+- [Étape 14 — Docker (prod) avec SQLite persistant](#étape-14--docker-prod-avec-sqlite-persistant)
 - [Étape 10 — Tests Postman automatisés (Newman) & CI](#étape-10--tests-postman-automatisés-newman--ci)
 - [Étape 9 — Auth obligatoire pour la lecture des posts](#étape-9--auth-obligatoire-pour-la-lecture-des-posts)
 - [Étape 8 — Posts: Keyset pagination](#étape-8--posts-keyset-pagination)
@@ -121,6 +122,7 @@ npx prisma generate
 3. Les requêtes de la collection utilisent `{{baseUrl}}` pour l'URL et, lorsque nécessaire, l'en-tête `Authorization: Bearer {{token}}`.
 
 ## Changelog
+- Étape 14 — Docker (prod) avec SQLite persistant
 - Étape 10 — Tests Postman automatisés (Newman) & CI
 - Étape 9 — Auth obligatoire pour la lecture des posts
 - Étape 8 — Posts: Keyset pagination
@@ -132,6 +134,60 @@ npx prisma generate
 - Étape 2 — Auth: Register
 - Étape 1 — Smoke test (GET /)
 - Étape 0 — Mise en place de la base documentaire
+
+## Étape 14 — Docker (prod) avec SQLite persistant
+
+**Objectif:** exécuter l’API en Docker (prod) avec SQLite persistant via `./data/dev.db`.
+
+**Prérequis:** Docker/Docker Desktop, `./data/` présent (un `.gitkeep` est fourni).
+
+**Fichiers ajoutés:** Dockerfile, docker-compose.yml, docker/entrypoint.sh, .dockerignore, .env.docker, data/.gitkeep.
+
+**Env:** ne pas committer de secrets ; dupliquer votre `.env` en `.env.docker` si besoin.
+
+### Lancer (prod)
+
+```bash
+cp .env.docker.example .env.docker   # si vous avez un exemple
+docker compose up --build -d
+# Logs:
+docker compose logs -f api
+```
+
+### Arrêter
+
+```bash
+docker compose down
+```
+
+**Persistance SQLite:** le fichier est sur l’hôte `./data/dev.db` (monté en `/data/dev.db`).
+
+**DBeaver:** se connecter au fichier local `./data/dev.db` (SQLite).
+
+**Postman:** mettre `baseUrl = http://localhost:3000` dans l’environnement.
+
+**Healthcheck:** `GET / → { "status": "ok" }`.
+
+**Notes:**
+- `prisma migrate deploy` est lancé au démarrage du container.
+- Pour un PostgreSQL futur, remplacez `DATABASE_URL` (et ajoutez un service DB dans `docker-compose.yml`).
+- `api-dev` (optionnel) permet le live-reload via `npm run start:dev` avec volumes montés.
+- Postman — mise à jour
+
+  Dans `postman/SocialPOC.local.postman_environment.json`, définir :
+
+  ```json
+  { "key": "baseUrl", "value": "http://localhost:3000", "type": "default", "enabled": true }
+  ```
+
+**Tous les tests existants restent valides (register/login/create/list/like).**
+
+**Critères d’acceptation**
+
+- `docker compose up --build` → l’API démarre, applique `migrate deploy`, répond sur `http://localhost:3000/`.
+- Le fichier `./data/dev.db` est créé/écrit (persistance OK).
+- Postman (avec `baseUrl=http://localhost:3000`) passe.
+- README (Étape 14) documente prod & dev (optionnel), persistance, DBeaver, et secrets.
 
 ## Étape 10 — Tests Postman automatisés (Newman) & CI
 
